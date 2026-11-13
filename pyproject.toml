@@ -1,17 +1,18 @@
 [project]
-name = "phil-defrost-monitoring"
+name = "hp-monitoring"
 version = "0.1.0"
 description = "Data Collection code for monitoring defrost cycles on Phil Kaluza air-to-water heat pump"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "duckdb>=2.0.0",
+    "labjackpython>=2.3.0",
     "opencv-python-headless>=5.0.0.93",
     "pyserial>=3.5",
 ]
 
 [project.scripts]
-phil-defrost-monitoring = "phil_defrost_monitoring:main"
+hp-monitoring = "hp_monitoring:main"
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]

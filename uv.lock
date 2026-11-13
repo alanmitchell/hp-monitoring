@@ -18,6 +18,34 @@ wheels = [
 ]
 
 [[package]]
+name = "hp-monitoring"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "duckdb" },
+    { name = "labjackpython" },
+    { name = "opencv-python-headless" },
+    { name = "pyserial" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "duckdb", specifier = ">=2.0.0" },
+    { name = "labjackpython", specifier = ">=2.3.0" },
+    { name = "opencv-python-headless", specifier = ">=5.0.0.93" },
+    { name = "pyserial", specifier = ">=3.5" },
+]
+
+[[package]]
+name = "labjackpython"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/89/47/79aee892589a810b6765567603f2b12640b3fda9d0af2e5fd70848be8441/labjackpython-2.3.0.tar.gz", hash = "sha256:00b6eec2b96796ae82826d9b98f4c600eb83c7e2cd88fb9d9e73c239c804e7e3", size = 146804, upload-time = "2026-07-30T21:52:06.627Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/41/5dc4d5ce8c229c3c6e22695d58ca6903905e309fac500c0db03fcc0e77ee/labjackpython-2.3.0-py2.py3-none-any.whl", hash = "sha256:63bb81d63f94d2bbc6ca32a35a55280d9e0f509b3df8174ed76c6e87a172d3c5", size = 116501, upload-time = "2026-07-30T21:52:05.464Z" },
+]
+
+[[package]]
 name = "numpy"
 version = "2.5.4"
 source = { registry = "https://pypi.org/simple" }
@@ -85,23 +113,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/9b/21/f6ef335f6e65724aa78b8d792b48d40a48c381715f1e62f5a5049e09d07e/opencv_python_headless-5.0.0.93-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:ed709fdf9aa0bd1f2ed8549e71d19449b03a675bb581eb292285f6861953be37", size = 61204038, upload-time = "2026-07-02T06:56:41.823Z" },
     { url = "https://files.pythonhosted.org/packages/d0/8f/b8756467ea991449a293797f6b3fa80fcfdd29598a0a60d1cd5715b96e61/opencv_python_headless-5.0.0.93-cp37-abi3-win32.whl", hash = "sha256:c6bcd96b185975ea240d22cfdb15a1f6d080cc95264cfbe2621f21bb144d89b9", size = 35411237, upload-time = "2026-07-02T05:50:12.901Z" },
     { url = "https://files.pythonhosted.org/packages/b8/88/763b967f7efd7226b82c9fae16d560cba049b1f0c036647e65c610fd636e/opencv_python_headless-5.0.0.93-cp37-abi3-win_amd64.whl", hash = "sha256:829717b6a95554f273e49e357cee3b3a2a26b6f4842fbc1bed2b45bdd8f87e0e", size = 43825962, upload-time = "2026-07-02T05:50:09.627Z" },
-]
-
-[[package]]
-name = "phil-defrost-monitoring"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "duckdb" },
-    { name = "opencv-python-headless" },
-    { name = "pyserial" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "duckdb", specifier = ">=2.0.0" },
-    { name = "opencv-python-headless", specifier = ">=5.0.0.93" },
-    { name = "pyserial", specifier = ">=3.5" },
 ]
 
 [[package]]
