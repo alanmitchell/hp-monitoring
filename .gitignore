@@ -219,3 +219,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# heatpump project: real config, calibration data, database and spool files stay out of git
+config/*
+!config/*.example.*
+*.duckdb
+*.duckdb.wal
+pics/
+spool/

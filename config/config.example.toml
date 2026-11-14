@@ -1,0 +1,3 @@
+# Example configuration for the heatpump package.
+# Copy to config/config.toml (ignored by git) and edit.
+# Settings will be added here as heatpump.common.config takes shape.

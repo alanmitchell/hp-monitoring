@@ -5,14 +5,41 @@ description = "Data Collection code for monitoring defrost cycles on Phil Kaluza
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "duckdb>=2.0.0",
-    "labjackpython>=2.3.0",
-    "opencv-python-headless>=5.0.0.93",
-    "pyserial>=3.5",
+    # Pinned exactly: every machine that connects over Quack must run the same version.
+    "duckdb==2.0.0",
 ]
 
+# Install only what a machine needs, e.g. `uv sync --extra analysis` on a laptop,
+# or `uv sync --all-extras` on the mini-PC.
+[project.optional-dependencies]
+sensors = [
+    "labjackpython>=2.3.0",
+    "pyserial>=3.5",
+]
+camera = [
+    "opencv-python-headless>=5.0.0.93",
+]
+analysis = []
+web = []
+
 [project.scripts]
-hp-monitoring = "hp_monitoring:main"
+hp-db = "heatpump.dbserver.main:main"
+hp-sensors = "heatpump.sensors.main:main"
+hp-camera = "heatpump.camera.main:main"
+hp-web = "heatpump.web.main:main"
+hp = "heatpump.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.8",
+]
+
+[tool.uv.build-backend]
+module-name = "heatpump"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
