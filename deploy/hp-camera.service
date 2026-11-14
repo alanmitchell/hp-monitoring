@@ -1,0 +1,22 @@
+[Unit]
+Description=Heat pump coil image capture (hp-camera)
+Wants=network-online.target
+After=network-online.target
+# Keep restarting forever; never give up after repeated failures
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Adjust the user and the /home/alan paths if the mini-PC differs
+User=alan
+WorkingDirectory=/home/alan/hp-monitoring
+# Holds RTSP_URL (contains the camera password); see config/hp-camera.example.env
+EnvironmentFile=/home/alan/hp-monitoring/config/hp-camera.env
+# Show print() output in the journal immediately
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/alan/hp-monitoring/.venv/bin/hp-camera
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
