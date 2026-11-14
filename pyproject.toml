@@ -25,7 +25,7 @@ web = []
 [project.scripts]
 hp-db = "heatpump.dbserver.main:main"
 hp-sensors = "heatpump.sensors.main:main"
-hp-camera = "heatpump.camera.main:main"
+hp-camera = "heatpump.camera.capture:main"
 hp-web = "heatpump.web.main:main"
 hp = "heatpump.cli:main"
 
