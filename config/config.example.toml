@@ -1,3 +1,38 @@
 # Example configuration for the heatpump package.
 # Copy to config/config.toml (ignored by git) and edit.
 # Settings will be added here as heatpump.common.config takes shape.
+
+# ---------------------------------------------------------------------------
+# hp-sensors
+# ---------------------------------------------------------------------------
+[sensors]
+max_interval = 60        # default: store each channel at least this often (seconds)
+flush_seconds = 2        # how often readings are written to the database
+watchdog_seconds = 120   # exit (and let systemd restart) if a thread is stuck this long
+
+# One [sensors.devices.<name>] table per device. Each device runs in its own thread.
+#   driver           which driver reads it (see src/heatpump/sensors/devices/)
+#   period           seconds between reads (not used by devices that stream data)
+#   report_together  true = when one channel is stored, store all of them (matched pairs)
+# Any other setting is passed to the driver.
+[sensors.devices.demo]
+driver = "fake"
+period = 1
+
+# One [sensors.devices.<name>.channels.<channel>] table per channel. The channel
+# name must be unique across all devices; it becomes the sensor name in the database.
+#   kind          "analog" (default) or "binary"
+#   unit, location, description   stored in the sensors table
+#   deadband      store a sample only when it differs from the last stored value by
+#                 more than this. Leave out to store every sample. 0 = any change.
+#   max_interval  overrides the default above
+# Any other setting is passed to the driver.
+[sensors.devices.demo.channels.demo_temp]
+unit = "degC"
+deadband = 0.5
+cycle_seconds = 120      # fake driver: length of one sine-wave cycle
+
+[sensors.devices.demo.channels.demo_switch]
+kind = "binary"
+deadband = 0
+cycle_seconds = 30

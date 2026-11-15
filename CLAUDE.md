@@ -239,6 +239,9 @@ Facts:
 - The extension autoinstalls on first use (needs internet once per machine).
 - `?` parameters fail in statements touching `hp.*` tables. Insert via a local
   temp table: `INSERT INTO hp.readings SELECT * FROM buf`.
+- One statement cannot scan an `hp.*` table and insert into another `hp.*` table
+  ("Multiple streaming scans ... not currently supported"). Local sources
+  (temp tables, `read_json` of a local file) inserted into `hp.*` work.
 - Server and client in one Python process hang. Use separate processes.
 - `CONNECT hp` exists, but Python's `con.sql()` fails while connected. Use ATTACH.
 - Fetching TIMESTAMPTZ into Python needs `pytz` (now a core dependency).
@@ -274,7 +277,7 @@ Frost metric options, simplest first: grayscale thresholding of the coil region,
 
 ## 8. Open questions for Alan
 
-1. What sensor hardware and interfaces? (1-Wire/DS18B20, I2C ADC, USB DAQ, Modbus power meter, GPIO inputs...) This determines the `sensors/` driver code and any additional packages.
+1. ~~What sensor hardware and interfaces?~~ Answered 2026-11-14; see section 10.
 2. What camera, and how is it connected? Is it fixed-position with lighting at night?
 3. How many sensor channels and cameras, really? (I assumed 10-30 and 1-2.)
 4. Expected retention and image volume: roughly how much disk, and when are old JPGs pruned?
@@ -291,3 +294,64 @@ Frost metric options, simplest first: grayscale thresholding of the coil region,
 6. Add `hp-web` with one graph and a hover-to-image view.
 7. Add real sensor drivers once the hardware questions are answered.
 8. Run a multi-day soak test on the mini-PC before relying on the setup.
+
+
+## 10. Sensors package plan [decided 2026-11-14]
+
+Agreed with Alan. Step 1 is built and tested; drivers follow.
+
+### Hardware (all USB on the mini-PC)
+
+| Device | Connection | How it is read | Fastest rate |
+|---|---|---|---|
+| LabJack U3 | USB | polled; several analog and digital channels | 1 s |
+| Energy Conservatory DG-700 pressure gauge | serial | polled | 10 s |
+| Heat pump controller | serial, own USB adapter | Modbus; probably **listen-only** on the controller-to-display link (not yet investigated) | 1 s |
+| WattNode power meter | serial, own USB adapter | Modbus, mini-PC is master | 1 s |
+| Adafruit CircuitPython board, 2 RTDs | serial | board streams supply/return pairs, both on one line | 1 s |
+
+### Design
+
+- **One `hp-sensors` process, one thread per port/device, one writer thread.**
+  Threads because the work is blocking I/O and one process means one Quack
+  connection, one spool and one systemd unit. `--only DEVICE` runs a subset, so
+  a troublesome device can be moved to its own process later.
+- **Driver interface** (`sensors/device.py`): subclass `Device`, implement
+  `read() -> {channel_name: raw value}`. Polled drivers are called every
+  `period` seconds on wall-clock boundaries. Streaming drivers
+  (`streaming = True`) block in `read()` until data arrives. `read()` must
+  always time out; any exception stores a `quality = 2` row, closes the device
+  and reopens it with backoff (1 s doubling to 30 s).
+- **Change filter** (`sensors/filter.py`), per channel: optional `deadband`
+  plus `max_interval`. No deadband means store every sample. On a change the
+  last skipped sample is stored too. `report_together = true` on a device stores
+  all its channels whenever one triggers (for the supply/return RTD pair, so
+  the ΔT error is not doubled). Sampling is at a fixed fast rate; the filter
+  replaces "fast during defrost, slow otherwise". Filtering is on raw values.
+- **Consequences for analysis**: readings are irregular, so averages and
+  `readings_1min` must be time-weighted. A gap longer than `max_interval` means
+  the collector was down. On/off channels are 0/1 with change-plus-heartbeat,
+  which settles the on/off open point in section 5.
+- **Writer** (`sensors/writer.py`): spool-first. Each batch is appended to a
+  JSONL file under `~/hp-data/spool/`, then spool files are loaded with
+  `read_json` and deleted. Known limit: a crash between insert and delete
+  duplicates that file's rows.
+- **Watchdog**: every thread updates `last_alive`; if one is stale for
+  `watchdog_seconds` the process exits and systemd restarts it.
+- **Config**: `[sensors]` in `config/config.toml` (plain `tomllib` and
+  dataclasses, no pydantic). Channel names are unique across devices and are
+  registered in the `sensors` table automatically.
+- **Serial ports** must be named by `/dev/serial/by-id/...`, never `ttyUSB0`.
+- **Modbus**: `modbus_master.py` for the WattNode; a separate hand-written
+  `modbus_listen.py` for the controller (pair each request with its response,
+  find frames by CRC, never transmit), sharing decoding code. Before the
+  listener, write a capture tool to discover serial settings and registers.
+  Log the WattNode's cumulative energy register so energy totals stay exact.
+
+### Build order
+
+1. ~~Framework, fake device, change filter, writer with spool-and-replay~~ (done)
+2. DG-700 driver (the gauge is already operational; Alan has sample reading code)
+3. RTD stream driver; Modbus master driver for the WattNode
+4. LabJack U3 driver
+5. Heat pump controller: capture tool, then listener driver

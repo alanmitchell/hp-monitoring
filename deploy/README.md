@@ -17,6 +17,21 @@ sudo systemctl enable --now hp-db
 `journalctl -u hp-db -f` follows the log. The service restarts 5 seconds after
 any exit or crash. `systemctl stop` lets it close the database cleanly.
 
+## hp-sensors
+
+```bash
+cp config/config.example.toml config/config.toml   # then describe your devices
+sudo usermod -aG dialout alan                      # serial port access; log out and in
+
+sudo cp deploy/hp-sensors.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now hp-sensors
+```
+
+It uses the same `config/hp-db.env` token file as hp-db. If hp-db is down,
+readings are spooled to `~/hp-data/spool/sensors/` and loaded when it returns.
+The service exits and is restarted if a device thread gets stuck.
+
 ## hp-camera
 
 ```bash

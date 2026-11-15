@@ -1,0 +1,24 @@
+[Unit]
+Description=Heat pump sensor collector (hp-sensors)
+# Start after the database when both start at boot. Not a hard dependency:
+# hp-sensors keeps running and spools to disk whenever hp-db is down.
+After=hp-db.service
+# Keep restarting forever; never give up after repeated failures
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Adjust the user and the /home/alan paths if the mini-PC differs.
+# The user must be in the 'dialout' group to open serial ports.
+User=alan
+WorkingDirectory=/home/alan/hp-monitoring
+# Holds HP_DB_TOKEN; see config/hp-db.example.env
+EnvironmentFile=/home/alan/hp-monitoring/config/hp-db.env
+# Show print() output in the journal immediately
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/alan/hp-monitoring/.venv/bin/hp-sensors
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

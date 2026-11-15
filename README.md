@@ -72,6 +72,9 @@ print(con.sql('SELECT * FROM hp.schema_info').fetchall())"
 Client code calls `heatpump.common.db.connect()` and uses the tables as
 `hp.<table>`. Things found by testing Quack on DuckDB 2.0.0:
 
+- One statement cannot read an `hp.*` table while inserting into another
+  ("Multiple streaming scans ... not currently supported"). Copy what you need
+  into a local temp table first.
 - `?` parameters fail in statements that touch `hp.*` tables ("Values were not
   provided for the following parameters"). Put rows into a local temp table
   first, then `INSERT INTO hp.readings SELECT * FROM buf`.
@@ -83,3 +86,53 @@ Client code calls `heatpump.common.db.connect()` and uses the tables as
 
 The schema lives in `src/heatpump/common/schema.py`. To change it, append a new
 entry to `MIGRATIONS`; `hp-db` applies it the next time it starts.
+
+## Sensors (`hp-sensors`)
+
+`hp-sensors` reads every device listed in `config/config.toml` and stores the
+readings through `hp-db`. Each device runs in its own thread, so a slow device
+does not delay the others.
+
+One-time setup:
+
+```bash
+cp config/config.example.toml config/config.toml   # then describe your devices
+```
+
+The example file defines a `demo` device using the `fake` driver, so this works
+with no hardware attached. See what a device produces without touching the
+database:
+
+```bash
+uv run hp-sensors --print                 # all devices
+uv run hp-sensors --print --only demo     # one device
+```
+
+Run it for real (with `hp-db` running in another terminal):
+
+```bash
+uv run --env-file config/hp-db.env hp-sensors
+```
+
+How it behaves:
+
+- **Timing**: polled devices are read every `period` seconds on clock boundaries
+  (a 1 s device reads at the top of each second). Streaming devices are read
+  whenever they send data.
+- **What gets stored**: with no `deadband`, every sample. With a `deadband`, only
+  samples that differ from the last stored value by more than it, plus one every
+  `max_interval` seconds. When a change is stored, the sample just before it is
+  stored too, so graphs show a step and not a false ramp. This means **averages
+  over time must be time-weighted**, not plain averages of rows.
+- **Failures**: a failed read stores a row with `quality = 2` and a NULL value,
+  then the device is closed and reopened, waiting 1, 2, 4 ... up to 30 s between
+  attempts.
+- **Database outages**: every batch is written to `~/hp-data/spool/sensors/`
+  before it is inserted, and deleted after. If `hp-db` is down, the files
+  accumulate and are loaded when it returns.
+- **Sensor names**: each channel name in the config is added to the `sensors`
+  table automatically the first time it is seen.
+
+Adding a driver: subclass `Device` in `src/heatpump/sensors/devices/`, implement
+`read()` to return `{channel_name: value}`, and add it to `DRIVERS` in
+`devices/__init__.py`. See `devices/fake.py` for the smallest example.

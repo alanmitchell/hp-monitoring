@@ -3,11 +3,7 @@
 A subprocess is required: a Quack server and client in one Python process hang.
 """
 
-import os
 import signal
-import socket
-import subprocess
-import sys
 
 import duckdb
 import pytest
@@ -31,30 +27,6 @@ def test_migrate_refuses_a_newer_database():
     con.execute("INSERT INTO schema_info (version) VALUES (?)", [schema.SCHEMA_VERSION + 1])
     with pytest.raises(RuntimeError):
         schema.migrate(con)
-
-
-def free_port() -> int:
-    with socket.socket() as s:
-        s.bind(("localhost", 0))
-        return s.getsockname()[1]
-
-
-@pytest.fixture
-def server(tmp_path, monkeypatch):
-    monkeypatch.setenv("HP_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("HP_DB_URI", f"quack:localhost:{free_port()}")
-    monkeypatch.setenv("HP_DB_TOKEN", "test-token")
-    proc = subprocess.Popen(
-        [sys.executable, "-u", "-m", "heatpump.dbserver.main"],
-        env=os.environ.copy(), stdout=subprocess.PIPE, text=True,
-    )
-    try:
-        # A new database prints a "Migrated schema" line first
-        assert any("Serving" in proc.stdout.readline() for _ in range(2))
-        yield proc
-    finally:
-        proc.kill()
-        proc.wait()
 
 
 def test_client_writes_survive_a_clean_shutdown(server):
