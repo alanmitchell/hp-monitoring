@@ -1,0 +1,22 @@
+[Unit]
+Description=Heat pump DuckDB server (hp-db)
+# Keep restarting forever; never give up after repeated failures
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Adjust the user and the /home/alan paths if the mini-PC differs
+User=alan
+WorkingDirectory=/home/alan/hp-monitoring
+# Holds HP_DB_TOKEN; see config/hp-db.example.env
+EnvironmentFile=/home/alan/hp-monitoring/config/hp-db.env
+# Show print() output in the journal immediately
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/alan/hp-monitoring/.venv/bin/hp-db
+# hp-db closes the database cleanly on SIGTERM; give it time to checkpoint
+TimeoutStopSec=60
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -39,3 +39,47 @@ If the systemd service is also running, stop it first
 (`sudo systemctl stop hp-camera`) so the two do not both write images.
 
 To run it as a service instead, see [deploy/README.md](deploy/README.md).
+
+## Database (`hp-db`)
+
+`hp-db` is the only process that opens the DuckDB file
+(`~/hp-data/heatpump.duckdb`). It creates or upgrades the schema at startup, then
+serves the database to the other processes over DuckDB's Quack protocol on
+`quack:localhost` (port 9494, reachable from this machine only).
+
+One-time setup:
+
+```bash
+cp config/hp-db.example.env config/hp-db.env   # then set HP_DB_TOKEN
+chmod 600 config/hp-db.env
+```
+
+Run it (Ctrl+C stops it cleanly):
+
+```bash
+uv run --env-file config/hp-db.env hp-db
+```
+
+Query it from another terminal while it runs:
+
+```bash
+uv run --env-file config/hp-db.env python -c "
+from heatpump.common.db import connect
+con = connect()
+print(con.sql('SELECT * FROM hp.schema_info').fetchall())"
+```
+
+Client code calls `heatpump.common.db.connect()` and uses the tables as
+`hp.<table>`. Things found by testing Quack on DuckDB 2.0.0:
+
+- `?` parameters fail in statements that touch `hp.*` tables ("Values were not
+  provided for the following parameters"). Put rows into a local temp table
+  first, then `INSERT INTO hp.readings SELECT * FROM buf`.
+- A Quack server and client inside the same Python process hang. Always use
+  separate processes (the tests start `hp-db` as a subprocess).
+- After `CONNECT hp`, Python's `con.sql()` fails; `ATTACH` with `hp.` prefixes
+  works, so the helper uses that.
+- While `hp-db` runs, nothing else can open the `.duckdb` file directly.
+
+The schema lives in `src/heatpump/common/schema.py`. To change it, append a new
+entry to `MIGRATIONS`; `hp-db` applies it the next time it starts.

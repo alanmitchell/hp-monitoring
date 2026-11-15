@@ -208,23 +208,42 @@ ASOF JOIN readings_cal r
 
 Viewer flow: query readings for the graphed window, query `images` for the same window, and on hover fetch the nearest image with `ORDER BY abs(epoch(ts) - epoch(?)) LIMIT 1`. **[verify]** The `ASOF JOIN` syntax above is from memory of DuckDB 1.x and was not re-tested on 2.0.
 
-## 6. Quack usage [verify]
+## 6. Quack usage [verified on DuckDB 2.0.0, 2026-11-14]
 
-The pattern discussed:
+Checked against the 2.0 docs (duckdb.org/docs/2.0/quack/) and by running it.
+Implemented in `dbserver/main.py` and `common/db.py`.
 
 ```python
 # hp-db process: the only process that opens the file
 con = duckdb.connect("heatpump.duckdb")
-con.execute("CALL quack_serve('quack:localhost', token='...')")
+con.execute("CALL quack_serve('quack:localhost', token = '...')")  # returns at once
+...
+con.execute("CALL quack_stop('quack:localhost')")
 
-# client (collector, web app, notebook)
+# client (collector, web app, notebook): heatpump.common.db.connect()
 con = duckdb.connect()
-con.execute("ATTACH 'quack:localhost' AS hp (TOKEN '...', DISABLE_SSL true)")
+con.execute("CREATE SECRET (TYPE quack, TOKEN '...', SCOPE 'quack:localhost')")
+con.execute("ATTACH 'quack:localhost' AS hp (TYPE quack)")
 con.sql("SELECT ... FROM hp.readings WHERE ts BETWEEN ... ")
-# hp.query('...') ships the whole query to the server so only results return
+con.sql("FROM hp.query('SELECT ...')")   # ships the whole query to the server
 ```
 
-**Treat this snippet as unverified.** It came from the *beta* Quack documentation (DuckDB 1.5.3 era). DuckDB 2.0 changed Quack and added a `CONNECT` statement. First task in Claude Code: read the current 2.0 Quack docs and correct the syntax, port, token handling and TLS defaults.
+Facts:
+
+- Default port 9494. `quack:localhost` binds to localhost only and uses plain
+  HTTP. Non-local URIs need `allow_other_hostname = true` on the server and
+  default to HTTPS with a self-signed certificate (`disable_ssl`, `ssl_cert_file`,
+  `ssl_key_file` on the server; `DISABLE_SSL`, `SSL_FINGERPRINT` on ATTACH). The
+  docs recommend a TLS reverse proxy over exposing Quack directly. hp-db
+  currently serves localhost only; laptop access over Tailscale is not built yet.
+- The extension autoinstalls on first use (needs internet once per machine).
+- `?` parameters fail in statements touching `hp.*` tables. Insert via a local
+  temp table: `INSERT INTO hp.readings SELECT * FROM buf`.
+- Server and client in one Python process hang. Use separate processes.
+- `CONNECT hp` exists, but Python's `con.sql()` fails while connected. Use ATTACH.
+- Fetching TIMESTAMPTZ into Python needs `pytz` (now a core dependency).
+- Client reconnect is off by default (`quack_enable_reconnects`). Untested here.
+- Client/server version compatibility is still undocumented. Keep the exact pin.
 
 Known uncertainties:
 
