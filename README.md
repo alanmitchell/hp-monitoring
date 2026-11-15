@@ -133,6 +133,15 @@ How it behaves:
 - **Sensor names**: each channel name in the config is added to the `sensors`
   table automatically the first time it is seen.
 
+Drivers so far:
+
+- `fake`: made-up values, for trying things without hardware.
+- `dg700`: Energy Conservatory DG-700 pressure gauge, one channel in Pascals.
+  Needs `uv sync --extra sensors`. The driver turns off the gauge's own
+  auto-zero and zeroes it itself: when the port is opened, then every 6 hours
+  (change with `auto_zero_seconds`).
+  A commented-out example is in `config/config.example.toml`.
+
 Adding a driver: subclass `Device` in `src/heatpump/sensors/devices/`, implement
 `read()` to return `{channel_name: value}`, and add it to `DRIVERS` in
 `devices/__init__.py`. See `devices/fake.py` for the smallest example.

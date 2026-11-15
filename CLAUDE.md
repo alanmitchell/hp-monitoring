@@ -351,7 +351,7 @@ Agreed with Alan. Step 1 is built and tested; drivers follow.
 ### Build order
 
 1. ~~Framework, fake device, change filter, writer with spool-and-replay~~ (done)
-2. DG-700 driver (the gauge is already operational; Alan has sample reading code)
+2. ~~DG-700 driver~~ (written from Alan's sample script and tested against a simulated gauge; not yet run on the real gauge)
 3. RTD stream driver; Modbus master driver for the WattNode
 4. LabJack U3 driver
 5. Heat pump controller: capture tool, then listener driver

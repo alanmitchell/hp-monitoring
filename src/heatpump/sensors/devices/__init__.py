@@ -7,6 +7,7 @@ from heatpump.sensors.device import Device
 
 # Imported only when used, so a machine needs only the libraries for its own hardware
 DRIVERS = {
+    "dg700": "heatpump.sensors.devices.dg700:DG700",
     "fake": "heatpump.sensors.devices.fake:FakeDevice",
 }
 

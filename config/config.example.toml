@@ -36,3 +36,17 @@ cycle_seconds = 120      # fake driver: length of one sine-wave cycle
 kind = "binary"
 deadband = 0
 cycle_seconds = 30
+
+# Energy Conservatory DG-700 pressure gauge (one channel, Pascals).
+# The gauge is zeroed when the port is opened and every 6 hours after that.
+# Find the port name with: ls /dev/serial/by-id/
+#[sensors.devices.dg700]
+#driver = "dg700"
+#period = 10
+#port = "/dev/serial/by-id/usb-Prolific_Technology_Inc._USB_2.0_To_COM_Device-if00-port0"
+#auto_zero_seconds = 21600   # optional: change how often the gauge is re-zeroed
+#
+#[sensors.devices.dg700.channels.coil_pressure]
+#unit = "Pa"
+#location = "outdoor unit"
+#description = "Pressure across the evaporator coil (DG-700)"
