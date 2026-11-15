@@ -208,6 +208,21 @@ def test_readings_survive_a_database_outage(server, tmp_path):
         restarted.wait()
 
 
+def test_config_file_is_saved_when_it_changes(server, tmp_path):
+    def flush_with(text):
+        q, writer = make_writer(tmp_path)
+        writer.config_text = text
+        q.put(Reading(at(0), "supply_temp", 1.0))
+        writer.flush()
+
+    flush_with("version one")
+    flush_with("version one")  # a restart with the same config stores nothing
+    flush_with("version two")
+    con = db.connect()
+    rows = con.execute("SELECT source, content FROM hp.config_history ORDER BY ts").fetchall()
+    assert rows == [("hp-sensors", "version one"), ("hp-sensors", "version two")]
+
+
 def test_spool_left_by_a_previous_run_is_loaded(db_env, tmp_path):
     q, writer = make_writer(tmp_path)  # hp-db is not running at all
     q.put(Reading(at(0), "supply_temp", 1.0))

@@ -95,7 +95,17 @@ LEFT JOIN calibrations c
  AND (c.valid_to IS NULL OR r.ts < c.valid_to);
 """
 
-MIGRATIONS = [V1]
+V2 = """
+-- A copy of the config file each time a process starts with a changed one, so it
+-- is known which channels and transforms produced the stored values
+CREATE TABLE config_history (
+    ts       TIMESTAMPTZ NOT NULL,
+    source   VARCHAR NOT NULL,              -- which program stored it, e.g. 'hp-sensors'
+    content  VARCHAR NOT NULL               -- the whole config file
+);
+"""
+
+MIGRATIONS = [V1, V2]
 SCHEMA_VERSION = len(MIGRATIONS)
 
 

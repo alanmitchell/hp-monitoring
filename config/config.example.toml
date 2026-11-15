@@ -50,3 +50,38 @@ cycle_seconds = 30
 #unit = "Pa"
 #location = "outdoor unit"
 #description = "Pressure across the evaporator coil (DG-700)"
+
+# LabJack U3-LV. The driver returns volts (analog) or 0/1 (digital); `transform`
+# turns that into the value that is stored.
+#   pin          AIN0-AIN15 = analog input, 0 to 2.44 V (AIN0-7 are the FIO0-7
+#                terminals, AIN8-15 are EIO0-7). FIO0-7, EIO0-7, CIO0-3 = digital input.
+#                A channel with no pin is computed only from other channels.
+#   samples      analog: average this many readings (default 1)
+#   long_settle  analog: true for high-resistance sources (default false)
+#   transform    a formula. x is this channel's raw reading; other channels on
+#                this device are referred to by name. Functions: thermistor, abs,
+#                min, max, round, sqrt, exp, log, log10, sin, cos, tan, atan.
+#   store        false = not stored, only used in other channels' formulas
+#[sensors.devices.labjack]
+#driver = "labjack_u3"
+#period = 1
+#
+## Voltage across the thermistor dividers (LM4040 reference, 2.048 V)
+#[sensors.devices.labjack.channels.therm_supply]
+#pin = "AIN3"
+#store = false
+#
+## Thermistor on the ground leg of a divider with a 10 kOhm fixed resistor.
+## a, b, c are Steinhart-Hart coefficients that give degrees Rankine; the result is degrees F.
+#[sensors.devices.labjack.channels.suction_temp]
+#pin = "AIN0"
+#unit = "degF"
+#deadband = 0.2
+#transform = "thermistor(x, therm_supply, r_fixed=10000, a=6.2736e-4, b=1.3006e-4, c=4.8753e-8, scale='rankine')"
+#
+## Digital input that reads 0 when the valve is energized
+#[sensors.devices.labjack.channels.defrost_valve]
+#pin = "FIO4"
+#kind = "binary"
+#deadband = 0
+#transform = "1 - x"

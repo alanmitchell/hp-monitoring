@@ -348,10 +348,31 @@ Agreed with Alan. Step 1 is built and tested; drivers follow.
   listener, write a capture tool to discover serial settings and registers.
   Log the WattNode's cumulative energy register so energy totals stay exact.
 
+- **Transforms** (`sensors/transform.py`, decided 2026-11-15): a channel's
+  `transform` is a formula applied between the driver and the change filter, so
+  **engineering values are stored, not raw values** (Alan's preference; this
+  overrides rule 1 in section 3 for sensor conversions; calibration corrections
+  still belong in the database). `x` is the channel's raw reading; other names
+  are channels on the same device or whitelisted functions. `store = false`
+  channels are inputs only. Formulas are validated at startup. Raw values can be
+  kept by adding an untransformed channel on the same pin. Cross-device
+  derivations belong in `analysis/`.
+- **`thermistor()` helper**: returns degrees F. Alan enters Steinhart-Hart
+  coefficients per channel and his produce degrees Rankine (`scale='rankine'`).
+  Thermistor is the ground leg of the divider by default; `r_fixed` per channel.
+  The dividers are powered by an LM4040 2.048 V reference, read on its own
+  analog channel, which is inside the U3-LV's 0 to 2.44 V input range.
+- **`config_history` table** (schema version 2): `hp-sensors` stores the config
+  file text whenever it changes, since stored values depend on it.
+- **LabJack is a U3-LV** (`devices/labjack_u3.py`): generic driver; each channel
+  names a `pin` (AIN0-15 analog, FIO/EIO/CIO digital). No pulse inputs: digital
+  values hold for over a second, so polling is enough. Needs the Exodriver
+  system library (not a Python package).
+
 ### Build order
 
 1. ~~Framework, fake device, change filter, writer with spool-and-replay~~ (done)
 2. ~~DG-700 driver~~ (written from Alan's sample script and tested against a simulated gauge; not yet run on the real gauge)
 3. RTD stream driver; Modbus master driver for the WattNode
-4. LabJack U3 driver
+4. ~~LabJack U3 driver~~ (tested against a simulated U3; not yet run on the real device)
 5. Heat pump controller: capture tool, then listener driver

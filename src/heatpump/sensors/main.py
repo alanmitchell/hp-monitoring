@@ -11,7 +11,7 @@ import signal
 import threading
 import time
 
-from heatpump.common.config import load_config
+from heatpump.common.config import config_path, load_config
 from heatpump.common.db import quack_token
 from heatpump.common.paths import data_dir
 from heatpump.sensors.config import parse
@@ -63,10 +63,11 @@ def main(argv: list[str] | None = None) -> None:
             spool_name = "sensors-" + "-".join(sorted(args.only)) if args.only else "sensors"
             writer = Writer(
                 readings,
-                [ch for d in devices for ch in d.channels],
+                [ch for d in devices for ch in d.channels if ch.store],
                 data_dir() / "spool" / spool_name,
                 stop,
                 config.flush_seconds,
+                config_text=config_path().read_text(),
             )
 
             def emit(batch: list[Reading]) -> None:

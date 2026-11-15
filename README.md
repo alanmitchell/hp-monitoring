@@ -142,6 +142,49 @@ Drivers so far:
   (change with `auto_zero_seconds`).
   A commented-out example is in `config/config.example.toml`.
 
+- `labjack_u3`: LabJack U3-LV. Returns volts for analog pins and 0/1 for
+  digital pins; see "Transforms" below. Needs `uv sync --extra sensors` and
+  LabJack's Exodriver system library:
+
+  ```bash
+  sudo apt install build-essential libusb-1.0-0-dev git
+  git clone https://github.com/labjack/exodriver.git
+  cd exodriver && sudo ./install.sh
+  ```
+
+### Transforms
+
+A channel's `transform` setting is a formula that turns the raw reading into the
+value that gets stored. It works on any device, not just the LabJack.
+
+```toml
+transform = "1 - x"                      # invert a digital input
+transform = "(x - 0.5) * 100"            # linear scaling
+transform = "thermistor(x, therm_supply, r_fixed=10000, a=..., b=..., c=..., scale='rankine')"
+```
+
+- `x` is the channel's own raw reading. Any other name is another channel on the
+  **same device** (its transformed value), or a function: `thermistor`, `abs`,
+  `min`, `max`, `round`, `sqrt`, `exp`, `log`, `log10`, `sin`, `cos`, `tan`, `atan`.
+- A channel with `store = false` is read and can be used in formulas, but is not
+  stored. A channel whose formula has no `x` is computed only from other channels.
+- Formulas are checked at startup; a mistake stops the program with a message.
+- While running, a formula that cannot produce a number (a failed input, a
+  division by zero, a shorted or disconnected thermistor) stores a failed reading.
+- The deadband applies to the transformed value.
+- **To also keep the raw value**, add a second channel on the same pin with no
+  transform.
+
+`thermistor(v, v_supply, r_fixed=..., a=..., b=..., c=..., scale=...)` returns
+degrees F for a thermistor in a voltage divider. `v` is the voltage at the
+junction, `v_supply` the voltage across the divider, `r_fixed` the fixed resistor
+in ohms, and `a`, `b`, `c` the Steinhart-Hart coefficients. `scale` says what the
+coefficients produce: `'rankine'` or `'kelvin'`. The thermistor is assumed to be
+the leg connected to ground; add `thermistor_leg='supply'` if it is the other leg.
+
+Because stored values now depend on the config file, `hp-sensors` saves a copy
+of the file into the `config_history` table whenever it starts with a changed one.
+
 Adding a driver: subclass `Device` in `src/heatpump/sensors/devices/`, implement
 `read()` to return `{channel_name: value}`, and add it to `DRIVERS` in
 `devices/__init__.py`. See `devices/fake.py` for the smallest example.

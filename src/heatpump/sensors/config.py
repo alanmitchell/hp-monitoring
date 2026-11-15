@@ -3,7 +3,9 @@
 from dataclasses import dataclass, field
 
 DEVICE_KEYS = {"driver", "period", "report_together", "channels"}
-CHANNEL_KEYS = {"kind", "unit", "location", "description", "deadband", "max_interval"}
+CHANNEL_KEYS = {
+    "kind", "unit", "location", "description", "deadband", "max_interval", "transform", "store",
+}  # fmt: skip
 
 
 @dataclass
@@ -15,6 +17,8 @@ class ChannelConfig:
     description: str | None = None
     deadband: float | None = None  # None = store every sample
     max_interval: float = 60.0  # seconds; store at least this often
+    transform: str | None = None  # formula from raw reading to engineering value
+    store: bool = True  # False = only used by other channels' transforms
     options: dict = field(default_factory=dict)  # anything else: driver-specific
 
 
@@ -65,6 +69,8 @@ def parse(raw: dict) -> SensorsConfig:
                     description=ch.get("description"),
                     deadband=None if deadband is None else float(deadband),
                     max_interval=float(ch.get("max_interval", default_max_interval)),
+                    transform=ch.get("transform"),
+                    store=bool(ch.get("store", True)),
                     options={k: v for k, v in ch.items() if k not in CHANNEL_KEYS},
                 )
             )

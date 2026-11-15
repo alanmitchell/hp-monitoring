@@ -22,6 +22,7 @@ from collections.abc import Callable
 from heatpump.common.timeutil import utc_now
 from heatpump.sensors.config import DeviceConfig
 from heatpump.sensors.filter import QUALITY_FAILED, QUALITY_OK, ChangeFilter, Reading
+from heatpump.sensors.transform import Transforms
 
 MAX_RETRY_WAIT = 30.0  # seconds; the wait doubles after each failure up to this
 
@@ -41,7 +42,10 @@ class Device:
         """Disconnect. Must be safe to call when not open."""
 
     def read(self) -> dict[str, float | None]:
-        """Return raw values keyed by channel name. None means that channel failed."""
+        """Return raw values keyed by channel name. None means that channel failed.
+
+        Any `transform` in the config is applied afterwards by the framework.
+        """
         raise NotImplementedError
 
 
@@ -57,9 +61,11 @@ class DeviceThread(threading.Thread):
         self.stop_event = stop
         self.last_alive = time.monotonic()  # watched by the watchdog in main
         self.period = device.config.period or 0.0
+        self.transforms = Transforms(device.config.channels)
         self.filters = {
             ch.name: ChangeFilter(ch.name, ch.deadband, ch.max_interval)
             for ch in device.config.channels
+            if ch.store
         }
         if not device.streaming and not device.config.period:
             raise ValueError(f"Device '{device.config.name}' needs a 'period' setting")
@@ -86,7 +92,7 @@ class DeviceThread(threading.Thread):
             except Exception as e:  # noqa: BLE001 - any driver error means reconnect
                 failures += 1
                 print(f"{name}: {type(e).__name__}: {e}")
-                self._handle(utc_now(), {ch: None for ch in self.filters})
+                self._handle(utc_now(), {ch.name: None for ch in self.device.config.channels})
                 self._close()
                 is_open = False
                 self.stop_event.wait(min(MAX_RETRY_WAIT, 2.0 ** (failures - 1)))
@@ -101,9 +107,9 @@ class DeviceThread(threading.Thread):
 
     def _handle(self, ts, values: dict[str, float | None]) -> None:
         samples = []
-        for ch, value in values.items():
+        for ch, value in self.transforms.apply(values).items():
             if ch not in self.filters:
-                continue  # the driver returned something the config does not list
+                continue  # a channel with store = false
             failed = value is None or math.isnan(value)
             samples.append(
                 (ch, None, QUALITY_FAILED) if failed else (ch, float(value), QUALITY_OK)

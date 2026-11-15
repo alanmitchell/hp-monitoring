@@ -17,8 +17,20 @@ def test_migrate_creates_schema_and_is_repeatable():
     assert schema.migrate(con) == schema.SCHEMA_VERSION  # second run does nothing
     tables = {r[0] for r in con.execute("SELECT table_name FROM duckdb_tables()").fetchall()}
     assert {"sensors", "calibrations", "readings", "images", "image_metrics",
-            "mode_intervals", "readings_1min", "schema_info"} <= tables
+            "mode_intervals", "readings_1min", "schema_info", "config_history"} <= tables
     con.execute("SELECT * FROM readings_cal")
+
+
+def test_migrate_upgrades_an_older_database():
+    con = duckdb.connect()
+    schema.current_version(con)  # creates schema_info
+    con.execute(schema.MIGRATIONS[0])
+    con.execute("INSERT INTO schema_info (version) VALUES (1)")
+    con.execute("INSERT INTO sensors (sensor_id, name, kind) VALUES (1, 'keep_me', 'analog')")
+    assert schema.migrate(con) == 1
+    assert schema.current_version(con) == schema.SCHEMA_VERSION
+    con.execute("SELECT ts, source, content FROM config_history")
+    assert con.execute("SELECT name FROM sensors").fetchall() == [("keep_me",)]
 
 
 def test_migrate_refuses_a_newer_database():

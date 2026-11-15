@@ -41,6 +41,7 @@ class Writer(threading.Thread):
         spool_dir: Path,
         stop: threading.Event,
         flush_seconds: float = 2.0,
+        config_text: str | None = None,
     ):
         super().__init__(name="writer", daemon=True)
         self.readings = readings
@@ -48,6 +49,7 @@ class Writer(threading.Thread):
         self.spool_dir = spool_dir
         self.stop_event = stop
         self.flush_seconds = flush_seconds
+        self.config_text = config_text  # saved to config_history when it changes
         self.period = flush_seconds
         self.last_alive = time.monotonic()  # watched by the watchdog in main
         self._con: duckdb.DuckDBPyConnection | None = None
@@ -112,6 +114,7 @@ class Writer(threading.Thread):
             con = db.connect()
             try:
                 self._register_sensors(con)
+                self._record_config(con)
             except duckdb.Error:
                 con.close()
                 raise
@@ -125,6 +128,21 @@ class Writer(threading.Thread):
             except duckdb.Error:
                 pass
             self._con = None
+
+    def _record_config(self, con: duckdb.DuckDBPyConnection) -> None:
+        """Save the config file to `config_history` if it differs from the last saved one."""
+        if self.config_text is None:
+            return
+        last = con.execute(
+            "SELECT content FROM hp.config_history WHERE source = 'hp-sensors' "
+            "ORDER BY ts DESC LIMIT 1"
+        ).fetchone()
+        if last and last[0] == self.config_text:
+            return
+        con.execute("CREATE OR REPLACE TEMP TABLE new_config (content VARCHAR)")
+        con.execute("INSERT INTO new_config VALUES (?)", [self.config_text])
+        con.execute("INSERT INTO hp.config_history SELECT now(), 'hp-sensors', content FROM new_config")
+        print("Saved the changed config file to config_history")
 
     def _register_sensors(self, con: duckdb.DuckDBPyConnection) -> None:
         """Add configured channels missing from the `sensors` table, and build the
