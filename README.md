@@ -3,8 +3,10 @@ Data collection related to analysis of the defrost cycle on Phil Kaluza's air-to
 
 ## Running the image capture script from the command line
 
-`hp-camera` saves a JPG of the coil every 60 seconds. It can be run directly,
-without systemd, for testing or one-off use.
+`hp-camera` saves a JPG of the coil every 60 seconds (or at a rate that depends
+on the heat pump's mode, see "Capture interval by mode" below) and records it in
+the `images` table of the database. It can be run directly, without systemd, for
+testing or one-off use.
 
 One-time setup, from the repo directory:
 
@@ -14,16 +16,12 @@ cp config/hp-camera.example.env config/hp-camera.env   # then edit RTSP_URL
 chmod 600 config/hp-camera.env
 ```
 
+It also needs the database token file, `config/hp-db.env` (see "Database" below).
+
 Run it:
 
 ```bash
-uv run --env-file config/hp-camera.env hp-camera
-```
-
-Or pass the camera URL directly instead of using the env file:
-
-```bash
-RTSP_URL='rtsp://user:password@192.168.1.50:554/stream1' uv run hp-camera
+uv run --env-file config/hp-camera.env --env-file config/hp-db.env hp-camera
 ```
 
 Press Ctrl+C to stop.
@@ -32,8 +30,60 @@ Images are written to `~/hp-data/images/coil/<date>/<HH-MM-SS>.jpg`, using local
 time. To write somewhere else, set `HP_DATA_DIR`:
 
 ```bash
-HP_DATA_DIR=/tmp/hp-test uv run --env-file config/hp-camera.env hp-camera
+HP_DATA_DIR=/tmp/hp-test uv run --env-file config/hp-camera.env --env-file config/hp-db.env hp-camera
 ```
+
+### Capture interval by mode
+
+The optional `[camera]` section of `config/config.toml` sets how often images
+are taken. Each `[camera.modes.<name>]` table gives a mode an `interval` and a
+`when` formula over the latest sensor readings:
+
+```toml
+[camera]
+interval = 60            # used while the mode is unknown
+
+[camera.modes.defrost]
+when = "defrost_valve == 1"
+interval = 10
+
+[camera.modes.heating]
+when = "compressor_kw > 0.5"
+interval = 120
+
+[camera.modes.off]       # no `when`: used when nothing above matched
+interval = 900
+```
+
+`hp-camera` reads the latest value of each channel named in the formulas from
+the database every `mode_check_seconds` (default 5). The first mode whose formula
+is true is used. When the mode changes an image is taken at once, and the new
+interval starts from there. The mode name is stored with each image in the
+`capture_ctx` column.
+
+If `hp-db` is down, or a channel has no good reading in the last
+`max_reading_age` seconds (default 180), the mode is unknown and the default
+`interval` is used. With no modes configured, images are taken every `interval`
+seconds. Restart `hp-camera` after changing the config file.
+
+### Image records
+
+Each saved image gets a row in the `images` table: capture time (UTC, to the
+second), path relative to `~/hp-data/images`, and width and height. `hp-db` does
+not have to be running. While it is down the images are still saved, their
+records wait in `~/hp-data/spool/camera/images.jsonl`, and they are loaded when
+`hp-db` is back.
+
+To record images that are on disk but not in the database (images captured
+before this feature existed, or after restoring an image archive):
+
+```bash
+uv run --env-file config/hp-db.env hp index-images
+```
+
+It reads the capture time from each file's name, so run it on the machine (time
+zone) that captured the images. It only adds what is missing, so it is safe to
+run again, and while `hp-camera` is running.
 
 If the systemd service is also running, stop it first
 (`sudo systemctl stop hp-camera`) so the two do not both write images.

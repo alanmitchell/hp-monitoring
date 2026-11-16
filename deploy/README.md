@@ -52,3 +52,17 @@ sudo systemctl restart hp-camera         # after pulling new code
 ```
 
 The service restarts 10 seconds after any exit or crash.
+
+It also reads the `config/hp-db.env` token file, because each image is recorded
+in the database. If hp-db is down, images are still saved; their records wait in
+`~/hp-data/spool/camera/images.jsonl` and are loaded when hp-db returns.
+
+**Upgrading a unit installed before image records existed:** copy the unit file
+again, then record the images already on disk:
+
+```bash
+sudo cp deploy/hp-camera.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl restart hp-camera
+uv run --env-file config/hp-db.env hp index-images
+```

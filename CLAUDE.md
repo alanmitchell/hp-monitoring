@@ -242,6 +242,11 @@ Facts:
 - One statement cannot scan an `hp.*` table and insert into another `hp.*` table
   ("Multiple streaming scans ... not currently supported"). Local sources
   (temp tables, `read_json` of a local file) inserted into `hp.*` work.
+- `INSERT INTO hp.images SELECT ... FROM <local table>` fails with "Sequence
+  with name image_id_seq does not exist", even when `image_id` is supplied,
+  because of the column's sequence default. `INSERT ... VALUES (literals)` works
+  and the server assigns the id (`camera/records.py` does this).
+  `hp.query('SELECT nextval(...)')` also works.
 - Server and client in one Python process hang. Use separate processes.
 - `CONNECT hp` exists, but Python's `con.sql()` fails while connected. Use ATTACH.
 - Fetching TIMESTAMPTZ into Python needs `pytz` (now a core dependency).
@@ -376,3 +381,71 @@ Agreed with Alan. Step 1 is built and tested; drivers follow.
 3. RTD stream driver; Modbus master driver for the WattNode
 4. ~~LabJack U3 driver~~ (tested against a simulated U3; not yet run on the real device)
 5. Heat pump controller: capture tool, then listener driver
+
+
+## 11. hp-web plan [decided 2026-11-15]
+
+Agreed with Alan. Step 1 is built and tested; the rest is not started.
+
+### Decisions
+
+- **No live view for now.** After-the-fact review is enough (answers question 5
+  in section 8).
+- **Access**: `hp-web` binds to localhost and `tailscale serve` publishes it to
+  the tailnet. No application login (answers question 6 in section 8).
+- **Plotly** for the graph, with no JS build step. Check whether the `plotly`
+  Python package ships `plotly.min.js`, so it can be served from there.
+- **Downsampling at query time**, not from `readings_1min`. Each request names a
+  time range and a point budget (about 2,000 per series). The server picks the
+  bucket size and returns time-weighted average, min and max per bucket; short
+  ranges return the stored rows.
+- **Zoom re-fetches.** On a Plotly zoom or pan the page requests the new visible
+  range with the same budget, so resolution follows the view down to the stored
+  data. Requests are debounced, the old trace stays until new data arrives, the
+  fetch covers a margin beyond the view, and min/max are drawn as a band so
+  short spikes show when zoomed out.
+- **Image panel**: the page holds the image list (id, ts) for the window and
+  finds the nearest image in the browser. Hover shows it, click pins it, arrow
+  keys step. Images are served by `image_id`, with the path looked up in the
+  database.
+- **Queries live in `analysis/queries.py`**; `web/` only parses parameters and
+  returns JSON. SQL is built from validated values (datetimes, integer ids)
+  because `?` parameters fail on `hp.*`.
+- API times are UTC; the page shows the browser's local time.
+
+### Build order
+
+1. ~~`hp-camera` writes `images` rows through a spool; `hp index-images`
+   backfills JPGs already on disk~~ (done; `camera/records.py`, `cli.py`.
+   Rows are deduplicated by path. Not yet run on the mini-PC.)
+2. `analysis/queries.py`: sensors, readings (bucketed), latest values, images.
+3. Web API: `/api/sensors`, `/api/latest`, `/api/readings`, `/api/images`,
+   `/images/{image_id}`.
+4. The page: graph, then image panel.
+5. `deploy/hp-web.service`, README, `tailscale serve` setup.
+6. Later: defrost shading from `mode_intervals`, frost-metric trace, thumbnails.
+
+To verify during step 2: `ASOF JOIN`, window functions and `readings_cal`
+through `hp.query(...)`; whether web requests can share one Quack connection.
+
+
+## 12. Camera capture interval by mode [built 2026-11-15]
+
+Alan asked for this ahead of the mode signals existing. Tested with fake
+readings only; the real channels and thresholds are not known yet.
+
+- `camera/mode.py`. The optional `[camera]` section of `config.toml` holds a
+  default `interval` (60 s) and ordered `[camera.modes.<name>]` tables, each
+  with an `interval` and a `when` formula over the latest sensor readings
+  (same formula rules as sensor transforms). First true formula wins; a mode
+  without `when` is the fallback and must be last.
+- `hp-camera` reads the latest reading of the needed channels from `hp-db`
+  every `mode_check_seconds` (5). A mode change triggers an image at once and
+  restarts the interval clock. The mode name is stored in `images.capture_ctx`.
+- Mode is unknown (default interval, `capture_ctx` NULL) when no modes are
+  configured, `hp-db` is down, or a needed channel has no good reading newer
+  than `max_reading_age` (180 s; must exceed the sensor's `max_interval`).
+- Not handled: a signal that flickers around a threshold causes an image on
+  every change. Add hysteresis or a minimum dwell if real data shows this.
+- Each image still opens and closes the RTSP stream (a few seconds). Fine at
+  10 s intervals; not measured on the real camera.

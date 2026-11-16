@@ -85,3 +85,34 @@ cycle_seconds = 30
 #kind = "binary"
 #deadband = 0
 #transform = "1 - x"
+
+# ---------------------------------------------------------------------------
+# hp-camera
+# ---------------------------------------------------------------------------
+# The whole section is optional. Without it an image is taken every 60 seconds.
+[camera]
+interval = 60            # seconds between images while the heat pump mode is unknown
+mode_check_seconds = 5   # how often the mode is re-checked between images
+max_reading_age = 180    # a sensor reading older than this (seconds) is not used
+
+# To take images at a rate that depends on what the heat pump is doing, add one
+# [camera.modes.<name>] table per mode.
+#   when      a formula over the latest readings of sensor channels (their names
+#             in the [sensors] section). Same functions as a sensor transform.
+#   interval  seconds between images while in this mode
+# Modes are tried in the order written; the first whose formula is true is used.
+# A mode with no `when` is used if no earlier mode matched, so it must be last.
+# An image is also taken at once whenever the mode changes. The mode name is
+# stored with each image (capture_ctx in the images table).
+# If the mode cannot be worked out (hp-db down, or a channel has no good reading
+# newer than max_reading_age), the mode is unknown and `interval` above is used.
+#[camera.modes.defrost]
+#when = "defrost_valve == 1"
+#interval = 10
+#
+#[camera.modes.heating]
+#when = "compressor_kw > 0.5"
+#interval = 120
+#
+#[camera.modes.off]
+#interval = 900

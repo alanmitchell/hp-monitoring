@@ -4,6 +4,7 @@ import os
 import socket
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -42,3 +43,12 @@ def server(db_env):
     finally:
         proc.kill()
         proc.wait()
+
+
+@pytest.fixture
+def anchorage(monkeypatch):
+    monkeypatch.setenv("TZ", "America/Anchorage")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()

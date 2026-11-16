@@ -1,7 +1,9 @@
 [Unit]
 Description=Heat pump coil image capture (hp-camera)
 Wants=network-online.target
-After=network-online.target
+# Start after the database when both start at boot. Not a hard dependency:
+# hp-camera keeps saving images and spools their records whenever hp-db is down.
+After=network-online.target hp-db.service
 # Keep restarting forever; never give up after repeated failures
 StartLimitIntervalSec=0
 
@@ -12,6 +14,8 @@ User=alan
 WorkingDirectory=/home/alan/hp-monitoring
 # Holds RTSP_URL (contains the camera password); see config/hp-camera.example.env
 EnvironmentFile=/home/alan/hp-monitoring/config/hp-camera.env
+# Holds HP_DB_TOKEN; see config/hp-db.example.env
+EnvironmentFile=/home/alan/hp-monitoring/config/hp-db.env
 # Show print() output in the journal immediately
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/home/alan/hp-monitoring/.venv/bin/hp-camera
