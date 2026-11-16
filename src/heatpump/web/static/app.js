@@ -2,10 +2,9 @@
 // under the pointer.
 //
 // All times inside this file are milliseconds since 1970 (UTC), as the API
-// returns them. Plotly has no time zone support and shows whatever it is given as
-// if it were UTC, so times are shifted by the local UTC offset on the way into
-// Plotly (toPlot) and shifted back on the way out (fromPlot). The graph then
-// shows local time.
+// returns them. Plotly shows a time given as a number in the browser's local
+// time, so times go into Plotly unchanged. What Plotly hands back (axis ranges,
+// the time under the pointer) is local time as text, "2026-11-14 05:32:10.5".
 
 "use strict";
 
@@ -36,18 +35,19 @@ const graph = $("graph");
 // Time helpers
 // ---------------------------------------------------------------------------
 
-const offsetMs = (ms) => new Date(ms).getTimezoneOffset() * 60000;
-const toPlot = (ms) => ms - offsetMs(ms);
-const fromPlot = (ms) => ms + offsetMs(ms);
-
-// Plotly reports axis ranges as numbers or as "2026-11-14 05:32:10.5" strings
+// A time from Plotly: a number is already milliseconds; text is local time.
+// Text with a "T" and no zone is read by the browser as local time.
 function plotValueToMs(value) {
-  const plotMs = typeof value === "number" ? value : Date.parse(String(value).replace(" ", "T") + "Z");
-  return fromPlot(plotMs);
+  if (typeof value === "number") return value;
+  let text = String(value).trim().replace(" ", "T");
+  if (!text.includes("T")) text += "T00:00";  // a bare date means local midnight
+  return Date.parse(text);
 }
 
 function toInputValue(ms) {
-  return new Date(toPlot(ms)).toISOString().slice(0, 19);  // local time, for datetime-local
+  // local time as "2026-11-14T05:32:10", for the datetime-local inputs
+  const local = ms - new Date(ms).getTimezoneOffset() * 60000;
+  return new Date(local).toISOString().slice(0, 19);
 }
 
 function formatTime(ms) {
@@ -291,7 +291,7 @@ function draw(data) {
     const axis = groups.indexOf(group) + 1;
     const yaxis = axis === 1 ? "y" : `y${axis}`;
     const color = colorOf(sensor);
-    const x = series.ts.map(toPlot);
+    const x = series.ts;
     const binary = sensor.kind === "binary";
     const unit = binary || !sensor.unit ? "" : ` ${sensor.unit}`;
 
@@ -342,7 +342,7 @@ function draw(data) {
     uirevision: "keep",          // keep legend choices when new data arrives
     xaxis: {
       type: "date",
-      range: [toPlot(state.view.start), toPlot(state.view.end)],
+      range: [state.view.start, state.view.end],
       uirevision: `${state.view.start}-${state.view.end}`,
       anchor: groups.length > 1 ? `y${groups.length}` : "y",
       gridcolor: grid, linecolor: axisLine, tickcolor: axisLine, tickfont: { color: muted },
@@ -399,7 +399,7 @@ function imageMarker() {
   if (!image) return [];
   return [{
     type: "line", xref: "x", yref: "paper",
-    x0: toPlot(image.ts), x1: toPlot(image.ts), y0: 0, y1: 1,
+    x0: image.ts, x1: image.ts, y0: 0, y1: 1,
     line: { color: cssVar("--text-2"), width: 1, dash: "dot" },
   }];
 }

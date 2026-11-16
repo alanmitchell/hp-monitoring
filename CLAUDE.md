@@ -456,8 +456,10 @@ Agreed with Alan. Steps 1 to 3 are built and tested; the page (step 4) is writte
    and the server log shows the page loaded, fetched readings and images, and
    re-fetched after a range change, but how it looks and behaves (hover across
    panels, double-click zoom out, local time) is unconfirmed. Design notes: one panel per unit sharing the time
-   axis, never two y scales in one panel; times are shifted by the local UTC
-   offset going into Plotly because Plotly has no time zones; each fetch covers
+   axis, never two y scales in one panel; times go into Plotly as epoch
+   milliseconds, which Plotly itself shows in the browser's local time (an
+   earlier version also shifted them and so was off by the UTC offset; fixed
+   2026-11-16, not yet confirmed by Alan); each fetch covers
    the view plus 15% each side; channel color follows its place in the catalog.
 5. ~~`deploy/hp-web.service`, README, Tailscale Funnel setup~~ (written
    2026-11-16; `deploy/README.md`. Not yet installed on the mini-PC, and the
