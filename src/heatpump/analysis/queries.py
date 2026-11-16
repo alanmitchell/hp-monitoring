@@ -201,12 +201,21 @@ def _add(series: Series, s0: int, width: int, i: int, avg, low, high) -> None:
     series.high.append(high)
 
 
-def images(con: duckdb.DuckDBPyConnection, start: datetime, end: datetime) -> list[dict]:
-    """Images captured in start <= time < end, oldest first."""
+def images(
+    con: duckdb.DuckDBPyConnection, start: datetime, end: datetime, max_images: int | None = None
+) -> list[dict]:
+    """Images captured in start <= time < end, oldest first.
+
+    If the range holds more than `max_images`, every 2nd, 3rd, ... image is
+    returned instead, so the answer stays about that size and still spans the range.
+    """
+    step = "1" if max_images is None else f"greatest(ceil(total / {int(max_images)})::BIGINT, 1)"
     rows = _query(
         con,
-        "SELECT image_id, epoch_ms(ts), capture_ctx FROM images "
-        f"WHERE ts >= {_ts(start)} AND ts < {_ts(end)} ORDER BY ts, image_id",
+        "SELECT image_id, epoch_ms(ts), capture_ctx FROM ("
+        "SELECT *, row_number() OVER (ORDER BY ts, image_id) AS n, count(*) OVER () AS total "
+        f"FROM images WHERE ts >= {_ts(start)} AND ts < {_ts(end)}) "
+        f"WHERE (n - 1) % {step} = 0 ORDER BY ts, image_id",
     )
     return [dict(zip(["image_id", "ts", "mode"], row, strict=True)) for row in rows]
 

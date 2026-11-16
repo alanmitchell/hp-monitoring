@@ -70,3 +70,53 @@ sudo systemctl daemon-reload
 sudo systemctl restart hp-camera
 uv run --env-file config/hp-db.env hp index-images
 ```
+
+## hp-web
+
+```bash
+sudo cp deploy/hp-web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now hp-web
+curl -s http://127.0.0.1:8000/api/sensors     # should print the channel list
+```
+
+It uses the same `config/hp-db.env` token file as hp-db, and listens on
+`127.0.0.1:8000` only. While hp-db is down the page shows an error; it recovers
+by itself.
+
+### Publishing it with Tailscale Funnel
+
+Funnel gives the page a public address, `https://<machine>.<tailnet>.ts.net`,
+that anyone on the internet can open without Tailscale. Tailscale provides the
+HTTPS certificate and passes requests on to hp-web.
+
+One-time setup:
+
+```bash
+sudo tailscale funnel --bg 8000
+```
+
+The first time, the command prints a link to the Tailscale admin console if
+Funnel or HTTPS certificates are not yet enabled for the tailnet. Follow it, then
+run the command again. `--bg` keeps Funnel on across reboots.
+
+```bash
+tailscale funnel status          # shows the public address
+sudo tailscale funnel reset      # takes the page off the internet
+```
+
+To publish to your own tailnet only, use `tailscale serve --bg 8000` instead.
+
+What to know about a public page:
+
+- **There is no login.** Anyone with the address sees the graphs and the coil
+  images. The address is not a secret: every HTTPS certificate is listed in
+  public logs, so scanners find new `ts.net` names within hours.
+- **Nothing can be changed through it.** hp-web only reads. The database
+  (port 9494) and SSH are not published; Funnel passes on port 8000 only.
+- **Each request is limited** (5,000 points per channel, 5,000 image records),
+  and search engines are told not to index the site. There is no limit on how
+  many requests a visitor makes; heavy traffic would slow the page but not stop
+  data collection, which does not depend on hp-web.
+- Funnel traffic passes through Tailscale's relay servers, which limit its
+  speed. Expect images to load more slowly than on the tailnet.

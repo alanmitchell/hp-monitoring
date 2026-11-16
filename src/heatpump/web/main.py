@@ -3,7 +3,7 @@
 Settings come from the optional `[web]` section of the config file::
 
     [web]
-    host = "127.0.0.1"       # this machine only; `tailscale serve` publishes it
+    host = "127.0.0.1"       # this machine only; Tailscale Funnel publishes it
     port = 8000
     max_gap_seconds = 300    # readings further apart than this are drawn as a gap
 """

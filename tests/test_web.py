@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from heatpump.camera import records
 from heatpump.common import db
+from heatpump.web import app as web_app
 from heatpump.web import main as web_main
 from heatpump.web.app import create_app
 
@@ -137,10 +138,31 @@ def test_images_and_image_file(client, con, anchorage):
     assert client.get("/images/abc").status_code == 422
 
 
+def test_long_image_ranges_are_thinned(client, con, monkeypatch):
+    rows = [records.image_row(T0 + timedelta(seconds=10 * i), records.image_relpath(
+        T0 + timedelta(seconds=10 * i)), None) for i in range(25)]
+    records.insert_images(con, rows)
+    monkeypatch.setattr(web_app, "MAX_IMAGES", 10)
+    listed = client.get("/api/images", params={"start": iso(0), "end": iso(600)}).json()
+    assert [(i["ts"] - listed[0]["ts"]) // 1000 for i in listed] == list(range(0, 250, 30))
+    # A range within the limit is returned whole
+    assert len(client.get("/api/images", params={"start": iso(0), "end": iso(95)}).json()) == 10
+
+
+def test_public_safeguards(client):
+    response = client.get("/api/sensors")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-robots-tag"].startswith("noindex")
+    assert "Disallow: /" in client.get("/robots.txt").text
+    too_many = {"sensors": "a", "start": iso(0), "end": iso(60), "max_points": 5001}
+    assert client.get("/api/readings", params=too_many).status_code == 422
+
+
 def test_database_down_gives_503(db_env):
     response = TestClient(create_app()).get("/api/sensors")
     assert response.status_code == 503
-    assert "database is unavailable" in response.json()["detail"]
+    # No details of the failure: the page may be on the public internet
+    assert response.json() == {"detail": "The database is unavailable"}
 
 
 def test_app_reconnects_after_hp_db_restarts(server, db_env):

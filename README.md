@@ -292,6 +292,10 @@ Open `http://127.0.0.1:8000`. It listens on this machine only. The optional
 `[web]` section of `config/config.toml` changes the host, port and
 `max_gap_seconds`.
 
+On the mini-PC it runs as a systemd service, and Tailscale Funnel publishes it
+on the internet at `https://<machine>.<tailnet>.ts.net`, with no login. See
+`deploy/README.md`, "hp-web".
+
 ### The page
 
 - **Time range:** the 1 h, 6 h, 24 h and 7 d buttons show that much time up to
@@ -323,13 +327,14 @@ Interactive documentation of the API is at `http://127.0.0.1:8000/docs`.
 | `GET /api/sensors` | the measurement channels |
 | `GET /api/latest` | every channel with its newest reading from the last day |
 | `GET /api/readings?sensors=a,b&start=...&end=...&max_points=2000` | readings of the named channels |
-| `GET /api/images?start=...&end=...` | the images captured in the range (id, time, mode) |
+| `GET /api/images?start=...&end=...` | the images captured in the range (id, time, mode); at most about 5,000, thinned evenly if there are more |
 | `GET /images/{image_id}` | one JPG |
 
 `start` and `end` are ISO 8601 times with a time zone, such as
 `2026-11-14T05:00:00Z`. Times in the answers are milliseconds since 1970, UTC.
 
-`/api/readings` never returns more than about `max_points` points per channel.
+`/api/readings` never returns more than about `max_points` points per channel
+(5,000 at most).
 A channel with more stored readings than that in the range is returned as
 buckets: `value` is the time-weighted average, `low` and `high` the smallest and
 largest reading in each bucket, and `bucket_seconds` the bucket length. Ask for

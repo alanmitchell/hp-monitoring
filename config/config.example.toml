@@ -122,7 +122,7 @@ max_reading_age = 180    # a sensor reading older than this (seconds) is not use
 # ---------------------------------------------------------------------------
 # The whole section is optional; these are the defaults.
 [web]
-host = "127.0.0.1"       # this machine only. `tailscale serve` publishes it to the tailnet.
+host = "127.0.0.1"       # this machine only. Tailscale Funnel publishes it (deploy/README.md).
 port = 8000
 max_gap_seconds = 300    # readings further apart than this are drawn as a gap, not a
                          # held value. Keep it above the largest max_interval in [sensors].

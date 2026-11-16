@@ -402,8 +402,13 @@ Agreed with Alan. Steps 1 to 3 are built and tested; the page (step 4) is writte
 
 - **No live view for now.** After-the-fact review is enough (answers question 5
   in section 8).
-- **Access**: `hp-web` binds to localhost and `tailscale serve` publishes it to
-  the tailnet. No application login (answers question 6 in section 8).
+- **Access**: `hp-web` binds to localhost. Originally `tailscale serve` (tailnet
+  only); on 2026-11-16 Alan asked for it to be public, so **Tailscale Funnel**
+  publishes it to the internet. Still no application login (answers question 6
+  in section 8). Because it is public: the app is read-only, answers are capped
+  (5,000 points per channel, 5,000 image records, thinned evenly), 503 errors
+  carry no details, and headers plus `robots.txt` ask not to be indexed. There
+  is no rate limit.
 - **Plotly** for the graph, with no JS build step. Check whether the `plotly`
   Python package ships `plotly.min.js`, so it can be served from there.
 - **Downsampling at query time**, not from `readings_1min`. Each request names a
@@ -454,7 +459,10 @@ Agreed with Alan. Steps 1 to 3 are built and tested; the page (step 4) is writte
    axis, never two y scales in one panel; times are shifted by the local UTC
    offset going into Plotly because Plotly has no time zones; each fetch covers
    the view plus 15% each side; channel color follows its place in the catalog.
-5. `deploy/hp-web.service`, README, `tailscale serve` setup.
+5. ~~`deploy/hp-web.service`, README, Tailscale Funnel setup~~ (written
+   2026-11-16; `deploy/README.md`. Not yet installed on the mini-PC, and the
+   Funnel commands were checked against `tailscale funnel --help` (1.102.3)
+   only, not run.)
 6. Later: defrost shading from `mode_intervals`, frost-metric trace, thumbnails.
 
 For step 3: web requests must share the Quack connection through a lock (see

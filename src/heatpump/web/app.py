@@ -7,6 +7,10 @@ A thin layer. The queries are in `heatpump.analysis.queries`; this module only
 checks the request, calls them and shapes the answer. Times in requests are ISO
 8601 with a time zone (``2026-11-14T05:00:00Z``); times in answers are epoch
 milliseconds, UTC. Interactive documentation of the endpoints is at /docs.
+
+The app may be published to the internet (Tailscale Funnel), with no login. So
+everything here is read-only, every answer has a size limit, and error messages
+say nothing about the machine.
 """
 
 import importlib.util
@@ -18,7 +22,7 @@ from typing import Annotated
 import duckdb
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from heatpump.analysis import queries
@@ -27,6 +31,17 @@ from heatpump.common.paths import image_root
 from heatpump.common.timeutil import utc_now
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Limits on one answer, so that no single request is expensive
+MAX_POINTS_LIMIT = 5000  # per channel; the page asks for 2,600
+MAX_IMAGES = 5000  # image records; longer ranges get every 2nd, 3rd, ... image
+
+HEADERS = {
+    "X-Content-Type-Options": "nosniff",  # browsers must not guess file types
+    "X-Frame-Options": "DENY",  # other sites may not embed the page
+    "Referrer-Policy": "no-referrer",
+    "X-Robots-Tag": "noindex, nofollow",  # keep the site out of search engines
+}
 
 When = Annotated[datetime, Query(description="ISO 8601 time with a time zone")]
 
@@ -73,7 +88,14 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
 
     @app.exception_handler(duckdb.Error)
     def database_unavailable(request: Request, exc: duckdb.Error):
-        return JSONResponse({"detail": f"The database is unavailable: {exc}"}, status_code=503)
+        print(f"Database error on {request.url.path}: {exc}")  # details go to the log only
+        return JSONResponse({"detail": "The database is unavailable"}, status_code=503)
+
+    @app.middleware("http")
+    async def add_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.update(HEADERS)
+        return response
 
     @app.get("/api/sensors")
     def sensors() -> list[dict]:
@@ -95,7 +117,7 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
         sensors: Annotated[str, Query(description="Channel names, separated by commas")],
         start: When,
         end: When,
-        max_points: Annotated[int, Query(ge=10, le=20000)] = queries.DEFAULT_MAX_POINTS,
+        max_points: Annotated[int, Query(ge=10, le=MAX_POINTS_LIMIT)] = queries.DEFAULT_MAX_POINTS,
     ) -> dict:
         """Readings of the named channels for start <= time < end.
 
@@ -133,9 +155,12 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
 
     @app.get("/api/images")
     def images(start: When, end: When) -> list[dict]:
-        """Images captured in start <= time < end, oldest first. Fetch one with /images/{image_id}."""
+        """Images captured in start <= time < end, oldest first. Fetch one with /images/{image_id}.
+
+        A range with more than 5,000 images returns every 2nd, 3rd, ... image.
+        """
         _check_range(start, end)
-        return database.run(queries.images, start, end)
+        return database.run(queries.images, start, end, MAX_IMAGES)
 
     @app.get("/images/{image_id}", response_class=FileResponse)
     def image(image_id: int):
@@ -164,8 +189,12 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
         spec = importlib.util.find_spec("plotly")
         path = Path(spec.origin).parent / "package_data" / "plotly.min.js" if spec else None
         if path is None or not path.is_file():
-            raise HTTPException(404, "plotly.min.js not found; run: uv sync --extra web")
+            raise HTTPException(404, "plotly.min.js not found; run: uv sync --all-extras")
         return FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
+
+    @app.get("/robots.txt", include_in_schema=False)
+    def robots():
+        return PlainTextResponse("User-agent: *\nDisallow: /\n")
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
