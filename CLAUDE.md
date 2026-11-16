@@ -206,7 +206,7 @@ ASOF JOIN readings_cal r
   ON r.name = 'coil_temp' AND i.ts >= r.ts;
 ```
 
-Viewer flow: query readings for the graphed window, query `images` for the same window, and on hover fetch the nearest image with `ORDER BY abs(epoch(ts) - epoch(?)) LIMIT 1`. **[verify]** The `ASOF JOIN` syntax above is from memory of DuckDB 1.x and was not re-tested on 2.0.
+Viewer flow: query readings for the graphed window, query `images` for the same window, and on hover fetch the nearest image with `ORDER BY abs(epoch(ts) - epoch(?)) LIMIT 1`. The `ASOF JOIN` above was run on DuckDB 2.0.0 on 2026-11-15, both against `hp.*` tables and through `hp.query(...)`, and works as written.
 
 ## 6. Quack usage [verified on DuckDB 2.0.0, 2026-11-14]
 
@@ -248,6 +248,12 @@ Facts:
   and the server assigns the id (`camera/records.py` does this).
   `hp.query('SELECT nextval(...)')` also works.
 - Server and client in one Python process hang. Use separate processes.
+- `FROM hp.query('SELECT ...')` runs window functions, `QUALIFY`, `ASOF JOIN`,
+  the `readings_cal` view and `INSERT ... SELECT` on the server. Checked
+  2026-11-15. `analysis/queries.py` sends every query this way.
+- Cursors of one client connection cannot run queries at the same time from
+  several threads: all but one fail with "INTERRUPT Error: superseded by a new
+  query". Use a lock around the connection, or one connection per thread.
 - `CONNECT hp` exists, but Python's `con.sql()` fails while connected. Use ATTACH.
 - Fetching TIMESTAMPTZ into Python needs `pytz` (now a core dependency).
 - Client reconnect is off by default (`quack_enable_reconnects`). Untested here.
@@ -418,15 +424,22 @@ Agreed with Alan. Step 1 is built and tested; the rest is not started.
 1. ~~`hp-camera` writes `images` rows through a spool; `hp index-images`
    backfills JPGs already on disk~~ (done; `camera/records.py`, `cli.py`.
    Rows are deduplicated by path. Not yet run on the mini-PC.)
-2. `analysis/queries.py`: sensors, readings (bucketed), latest values, images.
+2. ~~`analysis/queries.py`: sensors, readings (bucketed), latest values, images~~
+   (done and tested against a real `hp-db`. `readings()` returns stored rows
+   for a channel with at most `max_points` rows in the range, else buckets of a
+   standard width, 1 s to 1 day, aligned to multiples of the width. A value
+   holds until the next reading, for at most `max_gap` seconds (default 300;
+   must exceed every channel's `max_interval`); longer silences break the line.
+   Times come back as epoch milliseconds. Six channels over 3 days of 1 Hz
+   data took 0.13 s on the development machine, not the N150.)
 3. Web API: `/api/sensors`, `/api/latest`, `/api/readings`, `/api/images`,
    `/images/{image_id}`.
 4. The page: graph, then image panel.
 5. `deploy/hp-web.service`, README, `tailscale serve` setup.
 6. Later: defrost shading from `mode_intervals`, frost-metric trace, thumbnails.
 
-To verify during step 2: `ASOF JOIN`, window functions and `readings_cal`
-through `hp.query(...)`; whether web requests can share one Quack connection.
+For step 3: web requests must share the Quack connection through a lock (see
+section 6); queries take tens of milliseconds, so a lock is enough.
 
 
 ## 12. Camera capture interval by mode [built 2026-11-15]
