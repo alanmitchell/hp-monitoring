@@ -11,7 +11,7 @@ testing or one-off use.
 One-time setup, from the repo directory:
 
 ```bash
-uv sync --extra camera
+uv sync --all-extras    # see "Installing" below: never sync just one extra on the mini-PC
 cp config/hp-camera.example.env config/hp-camera.env   # then edit RTSP_URL
 chmod 600 config/hp-camera.env
 ```
@@ -89,6 +89,24 @@ If the systemd service is also running, stop it first
 (`sudo systemctl stop hp-camera`) so the two do not both write images.
 
 To run it as a service instead, see [deploy/README.md](deploy/README.md).
+
+## Installing
+
+On the mini-PC, always install every optional group together:
+
+```bash
+uv sync --all-extras
+```
+
+`uv sync` makes `.venv` match the command exactly, so it **removes** whatever
+the command does not name. `uv sync --extra web` uninstalls OpenCV and the
+sensor libraries; plain `uv sync` uninstalls all three groups. A running service
+carries on, because it has already loaded its libraries, then fails with
+`ModuleNotFoundError` the next time it restarts. `uv run` does not remove
+anything.
+
+On a machine that needs one group only (a laptop for analysis), `uv sync --extra
+<group>` is fine.
 
 ## Database (`hp-db`)
 
@@ -208,13 +226,13 @@ Drivers so far:
 
 - `fake`: made-up values, for trying things without hardware.
 - `dg700`: Energy Conservatory DG-700 pressure gauge, one channel in Pascals.
-  Needs `uv sync --extra sensors`. The driver turns off the gauge's own
+  Needs `uv sync --all-extras`. The driver turns off the gauge's own
   auto-zero and zeroes it itself: when the port is opened, then every 6 hours
   (change with `auto_zero_seconds`).
   A commented-out example is in `config/config.example.toml`.
 
 - `labjack_u3`: LabJack U3-LV. Returns volts for analog pins and 0/1 for
-  digital pins; see "Transforms" below. Needs `uv sync --extra sensors` and
+  digital pins; see "Transforms" below. Needs `uv sync --all-extras` and
   LabJack's Exodriver system library:
 
   ```bash
@@ -266,7 +284,7 @@ Adding a driver: subclass `Device` in `src/heatpump/sensors/devices/`, implement
 for any time on the graph. It is a client of `hp-db`, so `hp-db` must be running.
 
 ```bash
-uv sync --extra web
+uv sync --all-extras
 uv run --env-file config/hp-db.env hp-web
 ```
 

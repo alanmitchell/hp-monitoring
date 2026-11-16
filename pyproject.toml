@@ -11,8 +11,9 @@ dependencies = [
     "pytz>=2026.6",
 ]
 
-# Install only what a machine needs, e.g. `uv sync --extra analysis` on a laptop,
-# or `uv sync --all-extras` on the mini-PC.
+# Install only what a machine needs, e.g. `uv sync --extra analysis` on a laptop.
+# On the mini-PC always use `uv sync --all-extras`: `uv sync` removes every
+# extra the command does not name, which breaks the other services.
 [project.optional-dependencies]
 sensors = [
     "labjackpython>=2.3.0",

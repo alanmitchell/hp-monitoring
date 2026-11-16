@@ -3,6 +3,10 @@
 Unit files for the mini-PC. They assume the repo is at `/home/alan/hp-monitoring`,
 runs as user `alan`, and that `uv sync --all-extras` has created `.venv` there.
 
+**Always use `uv sync --all-extras` here.** `uv sync --extra camera` (or any
+single extra, or none) removes the other groups' libraries from `.venv`, and the
+other services then fail with `ModuleNotFoundError` at their next restart.
+
 ## hp-db
 
 ```bash
