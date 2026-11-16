@@ -3,12 +3,16 @@
 A subprocess is required: a Quack server and client in one Python process hang.
 """
 
+import shutil
 import signal
+import time
 
 import duckdb
 import pytest
+from conftest import start_hp_db
 
 from heatpump.common import db, schema
+from heatpump.dbserver import main
 
 
 def test_migrate_creates_schema_and_is_repeatable():
@@ -55,6 +59,37 @@ def test_client_writes_survive_a_clean_shutdown(server):
     con = duckdb.connect(str(db.db_path()), read_only=True)
     assert con.execute("SELECT count(*) FROM readings").fetchone()[0] == 1
     assert not db.db_path().with_suffix(".duckdb.wal").exists()  # checkpointed on close
+
+
+def test_timed_checkpoint_moves_writes_into_the_database_file(db_env, monkeypatch, tmp_path):
+    monkeypatch.setenv("HP_DB_CHECKPOINT_SECONDS", "0.5")
+    proc = start_hp_db()
+    try:
+        con = db.connect()
+        con.execute("INSERT INTO hp.sensors (sensor_id, name, kind) VALUES (1, 'a', 'analog')")
+        con.execute("INSERT INTO hp.readings (ts, sensor_id, value) VALUES (now(), 1, 35.5)")
+        # The client stays connected: a checkpoint must not need the clients gone
+        time.sleep(2)
+        # A copy of the database file alone, without its .wal, while hp-db runs
+        copy = tmp_path / "copy.duckdb"
+        shutil.copy(db.db_path(), copy)
+        local = duckdb.connect(str(copy), read_only=True)
+        assert local.execute("SELECT value FROM readings_cal").fetchall() == [(35.5,)]
+        con.execute("INSERT INTO hp.readings (ts, sensor_id, value) VALUES (now(), 1, 36)")
+        assert con.execute("SELECT count(*) FROM hp.readings").fetchone()[0] == 2
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def test_checkpoint_setting(monkeypatch):
+    monkeypatch.delenv("HP_DB_CHECKPOINT_SECONDS", raising=False)
+    assert main.checkpoint_seconds() == 3600
+    monkeypatch.setenv("HP_DB_CHECKPOINT_SECONDS", "0")
+    assert main.checkpoint_seconds() is None
+    monkeypatch.setenv("HP_DB_CHECKPOINT_SECONDS", "hourly")
+    with pytest.raises(SystemExit):
+        main.checkpoint_seconds()
 
 
 def test_wrong_token_is_rejected(server, monkeypatch):

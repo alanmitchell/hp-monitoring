@@ -137,6 +137,27 @@ Client code calls `heatpump.common.db.connect()` and uses the tables as
 The schema lives in `src/heatpump/common/schema.py`. To change it, append a new
 entry to `MIGRATIONS`; `hp-db` applies it the next time it starts.
 
+### Checkpoints and copying the database file
+
+DuckDB appends each write to `heatpump.duckdb.wal` first, and moves the log into
+`heatpump.duckdb` at a checkpoint. `hp-db` checkpoints every hour, and when it
+stops. Set `HP_DB_CHECKPOINT_SECONDS` in `config/hp-db.env` to change the hour
+(0 leaves it to DuckDB: at 16 MB of log, or on close).
+
+A copy of `heatpump.duckdb` alone, taken while `hp-db` runs, opens as a normal
+database holding everything up to the last checkpoint:
+
+```bash
+cp ~/hp-data/heatpump.duckdb /tmp/snapshot.duckdb
+uv run python -c "
+import duckdb
+con = duckdb.connect('/tmp/snapshot.duckdb', read_only=True)
+print(con.sql('SELECT max(ts) FROM readings').fetchall())"
+```
+
+Do not copy while a checkpoint is being written (on the hour after `hp-db`
+started, for about a second): the copy could mix old and new parts of the file.
+
 ## Sensors (`hp-sensors`)
 
 `hp-sensors` reads every device listed in `config/config.toml` and stores the

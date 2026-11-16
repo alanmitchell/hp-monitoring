@@ -255,6 +255,11 @@ Facts:
   several threads: all but one fail with "INTERRUPT Error: superseded by a new
   query". Use a lock around the connection, or one connection per thread.
 - `CONNECT hp` exists, but Python's `con.sql()` fails while connected. Use ATTACH.
+- `hp-db` runs `CHECKPOINT` every hour (`HP_DB_CHECKPOINT_SECONDS`; Alan asked
+  for this 2026-11-16). It works with Quack clients connected. A copy of the
+  `.duckdb` file alone, made while `hp-db` runs, opens and holds the data up to
+  the last checkpoint (tested). A copy made during a checkpoint is not tested
+  and may be inconsistent.
 - Fetching TIMESTAMPTZ into Python needs `pytz` (now a core dependency).
 - Client reconnect is off by default (`quack_enable_reconnects`). Untested here.
 - Client/server version compatibility is still undocumented. Keep the exact pin.
