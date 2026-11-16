@@ -391,7 +391,7 @@ Agreed with Alan. Step 1 is built and tested; drivers follow.
 
 ## 11. hp-web plan [decided 2026-11-15]
 
-Agreed with Alan. Step 1 is built and tested; the rest is not started.
+Agreed with Alan. Steps 1 to 3 are built and tested; the page is next.
 
 ### Decisions
 
@@ -432,8 +432,13 @@ Agreed with Alan. Step 1 is built and tested; the rest is not started.
    must exceed every channel's `max_interval`); longer silences break the line.
    Times come back as epoch milliseconds. Six channels over 3 days of 1 Hz
    data took 0.13 s on the development machine, not the N150.)
-3. Web API: `/api/sensors`, `/api/latest`, `/api/readings`, `/api/images`,
-   `/images/{image_id}`.
+3. ~~Web API: `/api/sensors`, `/api/latest`, `/api/readings`, `/api/images`,
+   `/images/{image_id}`~~ (done; `web/app.py`, `web/main.py`. Sensors are
+   named in requests, times are ISO 8601 with a zone. One Quack connection
+   behind a lock, retried once on a new connection after an error; 503 while
+   `hp-db` is down. Optional `[web]` config: host, port, `max_gap_seconds`.
+   Tested with FastAPI's TestClient against a real `hp-db`, and run once with
+   uvicorn. Tests need `httpx2`, not `httpx`.)
 4. The page: graph, then image panel.
 5. `deploy/hp-web.service`, README, `tailscale serve` setup.
 6. Later: defrost shading from `mode_intervals`, frost-metric trace, thumbnails.

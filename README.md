@@ -238,3 +238,41 @@ of the file into the `config_history` table whenever it starts with a changed on
 Adding a driver: subclass `Device` in `src/heatpump/sensors/devices/`, implement
 `read()` to return `{channel_name: value}`, and add it to `DRIVERS` in
 `devices/__init__.py`. See `devices/fake.py` for the smallest example.
+
+## Web app (`hp-web`)
+
+`hp-web` serves the data to a browser. So far it has the JSON API and the image
+files; the page with the graph is not built yet. It is a client of `hp-db`, so
+`hp-db` must be running.
+
+```bash
+uv sync --extra web
+uv run --env-file config/hp-db.env hp-web
+```
+
+It listens on `http://127.0.0.1:8000` (this machine only). The optional `[web]`
+section of `config/config.toml` changes the host, port and `max_gap_seconds`.
+Interactive documentation of the API is at `http://127.0.0.1:8000/docs`.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/sensors` | the measurement channels |
+| `GET /api/latest` | every channel with its newest reading from the last day |
+| `GET /api/readings?sensors=a,b&start=...&end=...&max_points=2000` | readings of the named channels |
+| `GET /api/images?start=...&end=...` | the images captured in the range (id, time, mode) |
+| `GET /images/{image_id}` | one JPG |
+
+`start` and `end` are ISO 8601 times with a time zone, such as
+`2026-11-14T05:00:00Z`. Times in the answers are milliseconds since 1970, UTC.
+
+`/api/readings` never returns more than about `max_points` points per channel.
+A channel with more stored readings than that in the range is returned as
+buckets: `value` is the time-weighted average, `low` and `high` the smallest and
+largest reading in each bucket, and `bucket_seconds` the bucket length. Ask for
+a shorter range to get finer buckets, and finally the stored readings
+themselves (`bucket_seconds` is null). A null in `value` marks a break in the
+line: a failed reading, or a silence longer than `max_gap_seconds`, which means
+`hp-sensors` was not running.
+
+If `hp-db` is down the API answers 503, and it reconnects by itself when
+`hp-db` is back.

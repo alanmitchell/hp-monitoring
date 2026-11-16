@@ -22,7 +22,10 @@ camera = [
     "opencv-python-headless>=5.0.0.93",
 ]
 analysis = []
-web = []
+web = [
+    "fastapi>=0.163.1",
+    "uvicorn>=0.54.0",
+]
 
 [project.scripts]
 hp-db = "heatpump.dbserver.main:main"
@@ -33,6 +36,7 @@ hp = "heatpump.cli:main"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.0",
     "pytest>=8",
     "ruff>=0.8",
 ]
