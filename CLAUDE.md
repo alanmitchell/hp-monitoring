@@ -391,7 +391,7 @@ Agreed with Alan. Step 1 is built and tested; drivers follow.
 
 ## 11. hp-web plan [decided 2026-11-15]
 
-Agreed with Alan. Steps 1 to 3 are built and tested; the page is next.
+Agreed with Alan. Steps 1 to 3 are built and tested; the page (step 4) is written but unchecked in a browser.
 
 ### Decisions
 
@@ -439,7 +439,16 @@ Agreed with Alan. Steps 1 to 3 are built and tested; the page is next.
    `hp-db` is down. Optional `[web]` config: host, port, `max_gap_seconds`.
    Tested with FastAPI's TestClient against a real `hp-db`, and run once with
    uvicorn. Tests need `httpx2`, not `httpx`.)
-4. The page: graph, then image panel.
+4. The page: graph, then image panel. Written (`web/static/index.html`,
+   `app.css`, `app.js`; plotly.js 4.1.1 served from the `plotly` package), and
+   the server side is tested. Claude has never seen the page: there was no
+   browser or JS engine in the build session. Alan opened a demo on 2026-11-15
+   and the server log shows the page loaded, fetched readings and images, and
+   re-fetched after a range change, but how it looks and behaves (hover across
+   panels, double-click zoom out, local time) is unconfirmed. Design notes: one panel per unit sharing the time
+   axis, never two y scales in one panel; times are shifted by the local UTC
+   offset going into Plotly because Plotly has no time zones; each fetch covers
+   the view plus 15% each side; channel color follows its place in the catalog.
 5. `deploy/hp-web.service`, README, `tailscale serve` setup.
 6. Later: defrost shading from `mode_intervals`, frost-metric trace, thumbnails.
 

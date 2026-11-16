@@ -170,3 +170,14 @@ def test_settings(tmp_path, monkeypatch):
         config.write_text(f"[web]\n{bad}\n")
         with pytest.raises(SystemExit):
             web_main.load_settings()
+
+
+def test_page_and_its_files(db_env):
+    client = TestClient(create_app())
+    page = client.get("/")
+    assert page.status_code == 200 and "<title>Heat pump monitoring</title>" in page.text
+    for path in ("static/app.js", "static/app.css", "static/plotly.min.js"):
+        assert f'"{path}"' in page.text
+        assert client.get(f"/{path}").status_code == 200
+    assert client.get("/static/plotly.min.js").text.lstrip().startswith("/**\n* plotly.js")
+    assert client.get("/static/../app.py").status_code == 404

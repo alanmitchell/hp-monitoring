@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Heat pump monitoring</title>
+  <link rel="stylesheet" href="static/app.css">
+</head>
+<body>
+  <header class="controls">
+    <h1>Heat pump</h1>
+    <div class="group" id="presets" role="group" aria-label="Time range">
+      <button type="button" data-hours="1">1 h</button>
+      <button type="button" data-hours="6">6 h</button>
+      <button type="button" data-hours="24">24 h</button>
+      <button type="button" data-hours="168">7 d</button>
+    </div>
+    <div class="group" role="group" aria-label="Move in time">
+      <button type="button" id="earlier" title="Earlier">&#9664;</button>
+      <button type="button" id="later" title="Later">&#9654;</button>
+      <button type="button" id="zoom-out" title="Back to the range chosen before zooming">Zoom out</button>
+    </div>
+    <form class="group custom" id="custom">
+      <label>From <input type="datetime-local" id="from" step="1" required></label>
+      <label>to <input type="datetime-local" id="to" step="1" required></label>
+      <button type="submit">Show</button>
+    </form>
+    <details class="picker" id="picker">
+      <summary>Channels <span id="picker-count"></span></summary>
+      <div class="picker-list" id="picker-list"></div>
+    </details>
+  </header>
+
+  <p class="banner" id="banner" hidden></p>
+
+  <main>
+    <section class="card graph-card">
+      <div id="graph"></div>
+      <p class="hint">Drag across the graph to zoom in; double-click to zoom back out.
+        Move the pointer over the graph to see the coil image for that time; click to hold it.</p>
+    </section>
+
+    <aside class="card image-card" id="image-card">
+      <div class="image-frame">
+        <img id="image" alt="Outdoor coil at the selected time" hidden>
+        <p class="placeholder" id="image-placeholder">No images in this time range.</p>
+      </div>
+      <div class="image-bar">
+        <button type="button" id="image-prev" title="Previous image (left arrow)">&#9664;</button>
+        <div class="image-caption">
+          <strong id="image-time">&nbsp;</strong>
+          <span id="image-note"></span>
+        </div>
+        <button type="button" id="image-next" title="Next image (right arrow)">&#9654;</button>
+      </div>
+      <div class="image-bar">
+        <span class="pin" id="image-pin" hidden>Held. Press Esc or click the graph again to follow the pointer.</span>
+        <a id="image-link" target="_blank" rel="noopener" hidden>Open full size</a>
+      </div>
+    </aside>
+  </main>
+
+  <section class="card latest">
+    <div class="latest-head">
+      <h2>Latest values</h2>
+      <button type="button" id="latest-refresh">Refresh</button>
+    </div>
+    <table>
+      <thead><tr><th>Channel</th><th class="num">Value</th><th>Unit</th><th>Last reading</th></tr></thead>
+      <tbody id="latest-body"></tbody>
+    </table>
+  </section>
+
+  <script src="static/plotly.min.js"></script>
+  <script src="static/app.js"></script>
+</body>
+</html>

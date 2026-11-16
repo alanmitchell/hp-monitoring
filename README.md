@@ -241,17 +241,42 @@ Adding a driver: subclass `Device` in `src/heatpump/sensors/devices/`, implement
 
 ## Web app (`hp-web`)
 
-`hp-web` serves the data to a browser. So far it has the JSON API and the image
-files; the page with the graph is not built yet. It is a client of `hp-db`, so
-`hp-db` must be running.
+`hp-web` serves a page with a graph of the sensor readings and the coil image
+for any time on the graph. It is a client of `hp-db`, so `hp-db` must be running.
 
 ```bash
 uv sync --extra web
 uv run --env-file config/hp-db.env hp-web
 ```
 
-It listens on `http://127.0.0.1:8000` (this machine only). The optional `[web]`
-section of `config/config.toml` changes the host, port and `max_gap_seconds`.
+Open `http://127.0.0.1:8000`. It listens on this machine only. The optional
+`[web]` section of `config/config.toml` changes the host, port and
+`max_gap_seconds`.
+
+### The page
+
+- **Time range:** the 1 h, 6 h, 24 h and 7 d buttons show that much time up to
+  now. The arrows move one screen earlier or later. "From" and "to" set any range.
+- **Channels:** pick the channels to graph. Channels with the same unit share a
+  panel; on/off channels have their own. A channel always has the same color.
+- **Zoom:** drag across the graph, or scroll, to zoom in. The page then fetches
+  that range again, so detail gets finer as you zoom, down to every stored
+  reading. Double-click, or press "Zoom out", to go back.
+- **Averages:** over long ranges the line is an average, and the shaded band
+  behind it runs from the lowest to the highest reading, so short spikes still show.
+- **Images:** move the pointer over the graph to see the image taken closest to
+  that time. Click to hold an image; the arrow keys (or the buttons under the
+  image) step to the previous or next one. Esc lets the image follow the
+  pointer again. A dotted line on the graph marks the image's time.
+- **Latest values:** the table at the bottom lists each channel's newest reading.
+- The address bar holds the channels and range, so a view can be bookmarked.
+  Times are shown in the browser's time zone.
+
+The page is three files in `src/heatpump/web/static/`, with no build step.
+Plotly's JavaScript comes from the `plotly` Python package.
+
+### The API
+
 Interactive documentation of the API is at `http://127.0.0.1:8000/docs`.
 
 | Endpoint | Returns |

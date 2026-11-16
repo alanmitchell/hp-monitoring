@@ -1,4 +1,7 @@
-"""The web app: JSON endpoints and image files for the browser.
+"""The web app: the page, its JSON endpoints and the image files.
+
+The page is three static files in `static/` (no build step) plus Plotly's
+JavaScript, which is served from the installed `plotly` Python package.
 
 A thin layer. The queries are in `heatpump.analysis.queries`; this module only
 checks the request, calls them and shapes the answer. Times in requests are ISO
@@ -6,19 +9,24 @@ checks the request, calls them and shapes the answer. Times in requests are ISO
 milliseconds, UTC. Interactive documentation of the endpoints is at /docs.
 """
 
+import importlib.util
 import threading
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 import duckdb
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from heatpump.analysis import queries
 from heatpump.common import db
 from heatpump.common.paths import image_root
 from heatpump.common.timeutil import utc_now
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 When = Annotated[datetime, Query(description="ISO 8601 time with a time zone")]
 
@@ -146,6 +154,20 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
             headers={"Cache-Control": "private, max-age=31536000, immutable"},
         )
 
+    @app.get("/", include_in_schema=False)
+    def page():
+        # no-cache: the browser checks for a newer page after the code is updated
+        return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+
+    @app.get("/static/plotly.min.js", include_in_schema=False)
+    def plotly_js():
+        spec = importlib.util.find_spec("plotly")
+        path = Path(spec.origin).parent / "package_data" / "plotly.min.js" if spec else None
+        if path is None or not path.is_file():
+            raise HTTPException(404, "plotly.min.js not found; run: uv sync --extra web")
+        return FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
+
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
 
 
