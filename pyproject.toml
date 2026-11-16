@@ -25,6 +25,7 @@ camera = [
 analysis = []
 web = [
     "fastapi>=0.163.1",
+    "pillow>=13.0.0",
     "plotly>=7.1.0",
     "uvicorn>=0.54.0",
 ]

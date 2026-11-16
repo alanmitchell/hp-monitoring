@@ -138,6 +138,45 @@ def test_images_and_image_file(client, con, anchorage):
     assert client.get("/images/abc").status_code == 422
 
 
+def test_thumbnail_is_made_once_and_kept(client, con, anchorage):
+    from PIL import Image
+
+    root = db.db_path().parent / "images"
+    rows = []
+    for s, size in [(0, (2560, 1440)), (60, (640, 360))]:
+        relpath = records.image_relpath(at(s))
+        (root / relpath).parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", size, (40, 90, 160)).save(root / relpath, "JPEG")
+        rows.append(records.image_row(at(s), relpath, size))
+    # A file that is not an image
+    bad = records.image_relpath(at(120))
+    (root / bad).write_bytes(b"not a jpg")
+    rows.append(records.image_row(at(120), bad, None))
+    records.insert_images(con, rows)
+    big, small, broken = (
+        i["image_id"] for i in client.get("/api/images", params={"start": iso(0), "end": iso(600)}).json()
+    )
+
+    response = client.get(f"/thumbs/{big}")
+    assert response.headers["content-type"] == "image/jpeg"
+    assert "immutable" in response.headers["cache-control"]
+    kept = db.db_path().parent / "thumbs" / "840" / rows[0]["path"]
+    with Image.open(kept) as thumb:
+        assert thumb.size == (840, 473)
+    assert response.content == kept.read_bytes()
+    assert len(response.content) < (root / rows[0]["path"]).stat().st_size
+    assert list(kept.parent.iterdir()) == [kept]  # no temporary file left behind
+
+    # The second request is answered from the kept file
+    kept.write_bytes(b"kept")
+    assert client.get(f"/thumbs/{big}").content == b"kept"
+    # A small image is sent as it is; the full size is still available
+    assert client.get(f"/thumbs/{small}").content == (root / rows[1]["path"]).read_bytes()
+    assert client.get(f"/images/{big}").content == (root / rows[0]["path"]).read_bytes()
+    assert client.get(f"/thumbs/{broken}").status_code == 404
+    assert client.get("/thumbs/999999").status_code == 404
+
+
 def test_long_image_ranges_are_thinned(client, con, monkeypatch):
     rows = [records.image_row(T0 + timedelta(seconds=10 * i), records.image_relpath(
         T0 + timedelta(seconds=10 * i)), None) for i in range(25)]

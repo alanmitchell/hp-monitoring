@@ -465,7 +465,12 @@ Agreed with Alan. Steps 1 to 3 are built and tested; the page (step 4) is writte
    2026-11-16; `deploy/README.md`. Not yet installed on the mini-PC, and the
    Funnel commands were checked against `tailscale funnel --help` (1.102.3)
    only, not run.)
-6. Later: defrost shading from `mode_intervals`, frost-metric trace, thumbnails.
+6. Later: defrost shading from `mode_intervals`, frost-metric trace.
+   ~~Thumbnails~~ (built 2026-11-16 after Alan found images took 3-5 s through
+   Funnel: `web/thumbs.py`, `GET /thumbs/{image_id}`, 840 px wide, made with
+   Pillow on first request and kept under `thumbs/840/` in the data directory.
+   The page shows the thumbnail; "Open full size" links to `/images/{id}`.
+   Nothing prunes the thumbnail folder.)
 
 For step 3: web requests must share the Quack connection through a lock (see
 section 6); queries take tens of milliseconds, so a lock is enough.

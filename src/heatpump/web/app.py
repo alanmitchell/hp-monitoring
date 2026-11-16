@@ -29,6 +29,7 @@ from heatpump.analysis import queries
 from heatpump.common import db
 from heatpump.common.paths import image_root
 from heatpump.common.timeutil import utc_now
+from heatpump.web import thumbs
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -162,9 +163,8 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
         _check_range(start, end)
         return database.run(queries.images, start, end, MAX_IMAGES)
 
-    @app.get("/images/{image_id}", response_class=FileResponse)
-    def image(image_id: int):
-        """The JPG file of one image."""
+    def image_file(image_id: int) -> tuple[Path, str]:
+        """An image's file and its path relative to the image root."""
         relpath = database.run(queries.image_path, image_id)
         if relpath is None:
             raise HTTPException(404, "No such image")
@@ -173,11 +173,32 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
         # The path comes from the database, but never serve a file outside the image root
         if not path.is_relative_to(root) or not path.is_file():
             raise HTTPException(404, "The image file is missing")
+        return path, path.relative_to(root).as_posix()
+
+    def jpeg(path: Path) -> FileResponse:
         # An image never changes, so the browser may keep it
         return FileResponse(
             path, media_type="image/jpeg",
             headers={"Cache-Control": "private, max-age=31536000, immutable"},
         )
+
+    @app.get("/images/{image_id}", response_class=FileResponse)
+    def image(image_id: int):
+        """The JPG file of one image, full size."""
+        return jpeg(image_file(image_id)[0])
+
+    @app.get("/thumbs/{image_id}", response_class=FileResponse)
+    def thumb(image_id: int):
+        """A small copy of one image (840 pixels wide), for showing beside the graph.
+
+        Made the first time it is asked for, then kept on disk.
+        """
+        path, relpath = image_file(image_id)
+        try:
+            return jpeg(thumbs.thumbnail(path, relpath))
+        except OSError as e:
+            print(f"No thumbnail for image {image_id} ({relpath}): {e}")
+            raise HTTPException(404, "The image file cannot be read") from None
 
     @app.get("/", include_in_schema=False)
     def page():

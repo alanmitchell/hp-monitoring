@@ -315,6 +315,11 @@ on the internet at `https://<machine>.<tailnet>.ts.net`, with no login. See
 - The address bar holds the channels and range, so a view can be bookmarked.
   Times are shown in the browser's time zone.
 
+The image beside the graph is a small copy, so it loads quickly; "Open full
+size" fetches the camera's original. A small copy is made the first time an
+image is viewed and kept in `~/hp-data/thumbs/`. That folder can be deleted at
+any time; the copies are made again when needed.
+
 The page is three files in `src/heatpump/web/static/`, with no build step.
 Plotly's JavaScript comes from the `plotly` Python package.
 
@@ -328,7 +333,8 @@ Interactive documentation of the API is at `http://127.0.0.1:8000/docs`.
 | `GET /api/latest` | every channel with its newest reading from the last day |
 | `GET /api/readings?sensors=a,b&start=...&end=...&max_points=2000` | readings of the named channels |
 | `GET /api/images?start=...&end=...` | the images captured in the range (id, time, mode); at most about 5,000, thinned evenly if there are more |
-| `GET /images/{image_id}` | one JPG |
+| `GET /images/{image_id}` | one JPG, full size |
+| `GET /thumbs/{image_id}` | the same image 840 pixels wide, which is what the page shows |
 
 `start` and `end` are ISO 8601 times with a time zone, such as
 `2026-11-14T05:00:00Z`. Times in the answers are milliseconds since 1970, UTC.

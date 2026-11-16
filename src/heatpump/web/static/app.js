@@ -495,9 +495,9 @@ function showImage(index) {
   $("image-prev").disabled = !image || index === 0;
   $("image-next").disabled = !image || index === state.images.length - 1;
   if (image) {
-    const url = `images/${image.image_id}`;
-    $("image").src = url;
-    $("image-link").href = url;
+    // A small copy beside the graph; the full image only on "Open full size"
+    $("image").src = `thumbs/${image.image_id}`;
+    $("image-link").href = `images/${image.image_id}`;
     $("image-time").textContent = formatTime(image.ts);
   } else {
     $("image").removeAttribute("src");
