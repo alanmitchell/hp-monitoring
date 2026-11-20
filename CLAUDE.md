@@ -471,6 +471,13 @@ Agreed with Alan. Steps 1 to 3 are built and tested; the page (step 4) is writte
    Pillow on first request and kept under `thumbs/840/` in the data directory.
    The page shows the thumbnail; "Open full size" links to `/images/{id}`.
    Nothing prunes the thumbnail folder.)
+   ~~Image rotation~~ (built 2026-11-19: `[web] image_rotate` = 0, 90, 180 or
+   270 degrees clockwise. Display only; files on disk and the database are
+   unchanged. Thumbnails are rotated when made and kept under
+   `thumbs/840-r90/` etc. `/images/{id}` rotates with Pillow on every request
+   (quality 90, nothing kept). `GET /api/settings` gives the page the value,
+   which it adds to image addresses as `?r=90` only to defeat the one-year
+   browser cache.)
 
 For step 3: web requests must share the Quack connection through a lock (see
 section 6); queries take tens of milliseconds, so a lock is enough.

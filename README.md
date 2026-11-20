@@ -289,8 +289,13 @@ uv run --env-file config/hp-db.env hp-web
 ```
 
 Open `http://127.0.0.1:8000`. It listens on this machine only. The optional
-`[web]` section of `config/config.toml` changes the host, port and
-`max_gap_seconds`.
+`[web]` section of `config/config.toml` changes the host, port,
+`max_gap_seconds` and `image_rotate`.
+
+If the camera is mounted on its side, set `image_rotate` to 90, 180 or 270 to
+show the images turned that many degrees clockwise, then restart `hp-web`. It
+applies to the image beside the graph and to "Open full size". The files from
+the camera are not changed.
 
 On the mini-PC it runs as a systemd service, and Tailscale Funnel publishes it
 on the internet at `https://<machine>.<tailnet>.ts.net`, with no login. See
@@ -316,9 +321,10 @@ on the internet at `https://<machine>.<tailnet>.ts.net`, with no login. See
   Times are shown in the browser's time zone.
 
 The image beside the graph is a small copy, so it loads quickly; "Open full
-size" fetches the camera's original. A small copy is made the first time an
-image is viewed and kept in `~/hp-data/thumbs/`. That folder can be deleted at
-any time; the copies are made again when needed.
+size" fetches the camera's original (turned, if `image_rotate` is set, and
+then compressed again). A small copy is made the first time an image is viewed
+and kept in `~/hp-data/thumbs/`, in a folder for each rotation used. That
+folder can be deleted at any time; the copies are made again when needed.
 
 The page is three files in `src/heatpump/web/static/`, with no build step.
 Plotly's JavaScript comes from the `plotly` Python package.
@@ -330,6 +336,7 @@ Interactive documentation of the API is at `http://127.0.0.1:8000/docs`.
 | Endpoint | Returns |
 |---|---|
 | `GET /api/sensors` | the measurement channels |
+| `GET /api/settings` | settings the page needs: `image_rotate` |
 | `GET /api/latest` | every channel with its newest reading from the last day |
 | `GET /api/readings?sensors=a,b&start=...&end=...&max_points=2000` | readings of the named channels |
 | `GET /api/images?start=...&end=...` | the images captured in the range (id, time, mode); at most about 5,000, thinned evenly if there are more |

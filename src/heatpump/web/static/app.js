@@ -16,6 +16,7 @@ const HOUR = 3600 * 1000;
 
 const state = {
   sensors: [],                 // the channel catalog from /api/sensors
+  imageRotate: 0,              // degrees clockwise the server turns the images (/api/settings)
   selected: [],                // names of the channels shown
   view: null,                  // {start, end}: the time range on screen
   home: null,                  // the range a double-click returns to
@@ -495,9 +496,12 @@ function showImage(index) {
   $("image-prev").disabled = !image || index === 0;
   $("image-next").disabled = !image || index === state.images.length - 1;
   if (image) {
-    // A small copy beside the graph; the full image only on "Open full size"
-    $("image").src = `thumbs/${image.image_id}`;
-    $("image-link").href = `images/${image.image_id}`;
+    // A small copy beside the graph; the full image only on "Open full size".
+    // The server does the rotating. The rotation is in the address only so that
+    // the browser does not show copies it kept from before the setting changed.
+    const turn = state.imageRotate ? `?r=${state.imageRotate}` : "";
+    $("image").src = `thumbs/${image.image_id}${turn}`;
+    $("image-link").href = `images/${image.image_id}${turn}`;
     $("image-time").textContent = formatTime(image.ts);
   } else {
     $("image").removeAttribute("src");
@@ -587,7 +591,12 @@ $("latest-refresh").addEventListener("click", loadLatest);
 
 async function start() {
   try {
-    state.sensors = await getJson("api/sensors");
+    const [sensors, settings] = await Promise.all([
+      getJson("api/sensors"),
+      getJson("api/settings"),
+    ]);
+    state.sensors = sensors;
+    state.imageRotate = settings.image_rotate || 0;
   } catch (error) {
     showBanner(`Could not load the channel list: ${error.message}. Reload the page to try again.`);
     return;

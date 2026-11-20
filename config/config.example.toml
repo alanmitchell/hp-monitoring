@@ -126,3 +126,6 @@ host = "127.0.0.1"       # this machine only. Tailscale Funnel publishes it (dep
 port = 8000
 max_gap_seconds = 300    # readings further apart than this are drawn as a gap, not a
                          # held value. Keep it above the largest max_interval in [sensors].
+image_rotate = 0         # show the coil images turned this many degrees clockwise: 0, 90,
+                         # 180 or 270. Both the image beside the graph and "Open full
+                         # size". The files from the camera are not changed.

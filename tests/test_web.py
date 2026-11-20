@@ -177,6 +177,70 @@ def test_thumbnail_is_made_once_and_kept(client, con, anchorage):
     assert client.get("/thumbs/999999").status_code == 404
 
 
+def test_images_are_rotated(con, anchorage):
+    from io import BytesIO
+
+    from PIL import Image
+
+    root = db.db_path().parent / "images"
+    rows = []
+    for s, size in [(0, (2560, 1440)), (60, (640, 360))]:
+        relpath = records.image_relpath(at(s))
+        (root / relpath).parent.mkdir(parents=True, exist_ok=True)
+        picture = Image.new("RGB", size, (40, 90, 160))
+        picture.paste((250, 250, 250), (0, 0, size[0] // 2, size[1] // 2))  # top left is white
+        picture.save(root / relpath, "JPEG")
+        rows.append(records.image_row(at(s), relpath, size))
+    bad = records.image_relpath(at(120))
+    (root / bad).write_bytes(b"not a jpg")
+    rows.append(records.image_row(at(120), bad, None))
+    records.insert_images(con, rows)
+    span = {"start": iso(0), "end": iso(600)}
+
+    def is_white(image, x, y):
+        return min(image.convert("RGB").getpixel((x, y))) > 200
+
+    client = TestClient(create_app(image_rotate=90))
+    assert client.get("/api/settings").json() == {"image_rotate": 90}
+    big, small, broken = (i["image_id"] for i in client.get("/api/images", params=span).json())
+
+    # The thumbnail is turned, 840 wide, and kept in a folder of its own
+    response = client.get(f"/thumbs/{big}?r=90")
+    kept = db.db_path().parent / "thumbs" / "840-r90" / rows[0]["path"]
+    assert response.content == kept.read_bytes()
+    with Image.open(kept) as thumb:
+        assert thumb.size == (840, 1493)
+        # Clockwise: what was top left is now top right
+        assert is_white(thumb, 800, 40) and not is_white(thumb, 40, 40)
+    # A small image is turned too, and not made bigger
+    with Image.open(BytesIO(client.get(f"/thumbs/{small}").content)) as thumb:
+        assert thumb.size == (360, 640)
+
+    # Full size: turned for each request, the camera's file left alone
+    original = (root / rows[0]["path"]).read_bytes()
+    response = client.get(f"/images/{big}?r=90")
+    assert response.headers["content-type"] == "image/jpeg"
+    assert "immutable" in response.headers["cache-control"]
+    with Image.open(BytesIO(response.content)) as full:
+        assert full.size == (1440, 2560)
+        assert is_white(full, 1400, 40) and not is_white(full, 40, 40)
+    assert (root / rows[0]["path"]).read_bytes() == original
+    assert client.get(f"/images/{broken}").status_code == 404
+    assert client.get(f"/thumbs/{broken}").status_code == 404
+
+    for degrees, size, white in [(180, (2560, 1440), (2500, 1400)), (270, (1440, 2560), (40, 2500))]:
+        turned = TestClient(create_app(image_rotate=degrees))
+        with Image.open(BytesIO(turned.get(f"/images/{big}").content)) as full:
+            assert full.size == size and is_white(full, *white)
+
+    # Not rotated: the file as it is
+    plain = TestClient(create_app())
+    assert plain.get("/api/settings").json() == {"image_rotate": 0}
+    assert plain.get(f"/images/{big}").content == original
+    with pytest.raises(ValueError):
+        create_app(image_rotate=45)
+
+
 def test_long_image_ranges_are_thinned(client, con, monkeypatch):
     rows = [records.image_row(T0 + timedelta(seconds=10 * i), records.image_relpath(
         T0 + timedelta(seconds=10 * i)), None) for i in range(25)]
@@ -222,12 +286,19 @@ def test_app_reconnects_after_hp_db_restarts(server, db_env):
 
 def test_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("HP_CONFIG", str(tmp_path / "missing.toml"))
-    assert web_main.load_settings() == {"host": "127.0.0.1", "port": 8000, "max_gap_seconds": 300}
+    assert web_main.load_settings() == {
+        "host": "127.0.0.1", "port": 8000, "max_gap_seconds": 300, "image_rotate": 0,
+    }
     config = tmp_path / "config.toml"
     monkeypatch.setenv("HP_CONFIG", str(config))
     config.write_text("[web]\nport = 8080\n")
     assert web_main.load_settings()["port"] == 8080
-    for bad in ('port = "eighty"', "colour = 1", "max_gap_seconds = 0"):
+    config.write_text("[web]\nimage_rotate = 90\n")
+    assert web_main.load_settings()["image_rotate"] == 90
+    for bad in (
+        'port = "eighty"', "colour = 1", "max_gap_seconds = 0",
+        "image_rotate = 45", 'image_rotate = "90"', "image_rotate = 90.0", "image_rotate = false",
+    ):
         config.write_text(f"[web]\n{bad}\n")
         with pytest.raises(SystemExit):
             web_main.load_settings()

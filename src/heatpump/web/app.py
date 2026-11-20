@@ -22,7 +22,7 @@ from typing import Annotated
 import duckdb
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from heatpump.analysis import queries
@@ -82,7 +82,10 @@ class Database:
             self._con = None
 
 
-def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
+def create_app(max_gap: float = queries.DEFAULT_MAX_GAP, image_rotate: int = 0) -> FastAPI:
+    """`image_rotate`: images are shown turned this many degrees clockwise (0, 90, 180, 270)."""
+    if image_rotate not in thumbs.ROTATIONS:
+        raise ValueError("image_rotate must be 0, 90, 180 or 270")
     app = FastAPI(title="Heat pump monitoring")
     app.add_middleware(GZipMiddleware, minimum_size=2000)
     database = Database()
@@ -97,6 +100,11 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
         response = await call_next(request)
         response.headers.update(HEADERS)
         return response
+
+    @app.get("/api/settings")
+    def settings() -> dict:
+        """Settings the page needs: `image_rotate`, degrees clockwise the images are turned."""
+        return {"image_rotate": image_rotate}
 
     @app.get("/api/sensors")
     def sensors() -> list[dict]:
@@ -175,30 +183,45 @@ def create_app(max_gap: float = queries.DEFAULT_MAX_GAP) -> FastAPI:
             raise HTTPException(404, "The image file is missing")
         return path, path.relative_to(root).as_posix()
 
+    # An image never changes, so the browser may keep it. The page adds the
+    # rotation to the address (?r=90), so a changed setting is a new address.
+    keep = {"Cache-Control": "private, max-age=31536000, immutable"}
+
     def jpeg(path: Path) -> FileResponse:
-        # An image never changes, so the browser may keep it
-        return FileResponse(
-            path, media_type="image/jpeg",
-            headers={"Cache-Control": "private, max-age=31536000, immutable"},
-        )
+        return FileResponse(path, media_type="image/jpeg", headers=keep)
+
+    def unreadable(image_id: int, relpath: str, error: OSError) -> HTTPException:
+        print(f"Image {image_id} ({relpath}) cannot be read: {error}")
+        return HTTPException(404, "The image file cannot be read")
 
     @app.get("/images/{image_id}", response_class=FileResponse)
     def image(image_id: int):
-        """The JPG file of one image, full size."""
-        return jpeg(image_file(image_id)[0])
+        """The JPG of one image, full size.
+
+        The camera's file as it is, unless `image_rotate` is set: then the
+        image is turned and compressed again for each request.
+        """
+        path, relpath = image_file(image_id)
+        if not image_rotate:
+            return jpeg(path)
+        try:
+            data = thumbs.rotated_jpeg(path, image_rotate)
+        except OSError as e:
+            raise unreadable(image_id, relpath, e) from None
+        return Response(data, media_type="image/jpeg", headers=keep)
 
     @app.get("/thumbs/{image_id}", response_class=FileResponse)
     def thumb(image_id: int):
         """A small copy of one image (840 pixels wide), for showing beside the graph.
 
-        Made the first time it is asked for, then kept on disk.
+        Made the first time it is asked for, then kept on disk. Turned by
+        `image_rotate`, like the full-size image.
         """
         path, relpath = image_file(image_id)
         try:
-            return jpeg(thumbs.thumbnail(path, relpath))
+            return jpeg(thumbs.thumbnail(path, relpath, image_rotate))
         except OSError as e:
-            print(f"No thumbnail for image {image_id} ({relpath}): {e}")
-            raise HTTPException(404, "The image file cannot be read") from None
+            raise unreadable(image_id, relpath, e) from None
 
     @app.get("/", include_in_schema=False)
     def page():
