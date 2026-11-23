@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [[package]]
@@ -106,6 +106,9 @@ dependencies = [
 camera = [
     { name = "opencv-python-headless" },
 ]
+frost = [
+    { name = "opencv-python-headless" },
+]
 sensors = [
     { name = "labjackpython" },
     { name = "pyserial" },
@@ -130,13 +133,14 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.163.1" },
     { name = "labjackpython", marker = "extra == 'sensors'", specifier = ">=2.3.0" },
     { name = "opencv-python-headless", marker = "extra == 'camera'", specifier = ">=5.0.0.93" },
+    { name = "opencv-python-headless", marker = "extra == 'frost'", specifier = ">=5.0.0.93" },
     { name = "pillow", marker = "extra == 'web'", specifier = ">=13.0.0" },
     { name = "plotly", marker = "extra == 'web'", specifier = ">=7.1.0" },
     { name = "pyserial", marker = "extra == 'sensors'", specifier = ">=3.5" },
     { name = "pytz", specifier = ">=2026.6" },
     { name = "uvicorn", marker = "extra == 'web'", specifier = ">=0.54.0" },
 ]
-provides-extras = ["sensors", "camera", "analysis", "web"]
+provides-extras = ["sensors", "camera", "analysis", "frost", "web"]
 
 [package.metadata.requires-dev]
 dev = [

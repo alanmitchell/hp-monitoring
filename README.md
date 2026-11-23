@@ -90,6 +90,56 @@ If the systemd service is also running, stop it first
 
 To run it as a service instead, see [deploy/README.md](deploy/README.md).
 
+## Frost score
+
+`frost` is a derived sensor: the estimated amount of frost on the evaporator
+coil, from 0 (none) to 10. It is stored in `readings` like any other channel, so
+it can be picked in the hp-web graphs.
+
+- **Fan running** (`coil_pressure` of 20 Pa or more): a score every 15 seconds,
+  on the clock (:00, :15, :30, :45), from the average `coil_pressure` over the
+  15 seconds centred on that time. 23 Pa or less is 0, 80 Pa or more is 10, and
+  it is linear in between. Readings below 20 Pa are left out of the average.
+- **Fan not running**: each coil image gets a score, stored with the image's
+  time. This also happens when there has been no pressure reading for a minute.
+  The score comes from how white the coil looks and how sharp the fin lines are
+  (`src/heatpump/analysis/frost_image.py`).
+
+`hp-frost` keeps the scores up to date. It runs about 20 seconds behind, and
+after a stop or a database outage it continues from the last stored score:
+
+```bash
+uv run --env-file config/hp-db.env hp-frost
+```
+
+To compute scores for data already in the database (this replaces any scores
+already stored in that time range, so it can be run again):
+
+```bash
+uv run --env-file config/hp-db.env hp frost-backfill                          # from 2026-11-16 1:42 PM AKST
+uv run --env-file config/hp-db.env hp frost-backfill --start 2026-12-01T00:00 # local time
+```
+
+Stop `hp-frost` while a backfill runs (`sudo systemctl stop hp-frost`), so the
+two do not store the same scores twice. About 6 days took 4 minutes on the
+development machine.
+
+The image function was fitted to images taken while the fan ran, using the
+pressure score as the right answer. To fit it again once there is more data
+(it rewrites `src/heatpump/analysis/frost_model.json`; run a backfill afterwards
+to apply it to the stored scores):
+
+```bash
+uv run --env-file config/hp-db.env hp frost-train
+```
+
+It prints how far the image score was from the pressure score on days it was
+not fitted on. With the first 6 days of data that was 0.7 score points on
+average, and worse (about 1.7, reading low) for scores above 8, of which there
+were only 11 images.
+
+To run `hp-frost` as a service, see [deploy/README.md](deploy/README.md).
+
 ## Installing
 
 On the mini-PC, always install every optional group together:

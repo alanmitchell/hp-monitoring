@@ -71,6 +71,36 @@ sudo systemctl restart hp-camera
 uv run --env-file config/hp-db.env hp index-images
 ```
 
+## hp-frost
+
+Computes the `frost` sensor (see "Frost score" in the main README). Needs only
+the `config/hp-db.env` token file.
+
+```bash
+sudo cp deploy/hp-frost.service /etc/systemd/system/
+sudo systemctl daemon-reload
+uv run --env-file config/hp-db.env hp frost-backfill   # scores for the data so far
+sudo systemctl enable --now hp-frost                   # start now and at every boot
+```
+
+Run the backfill first: on a database with no frost scores `hp-frost` starts
+from now, otherwise it continues after the last stored score.
+
+```bash
+systemctl status hp-frost
+journalctl -u hp-frost -f                # follow the log
+sudo systemctl restart hp-frost          # after pulling new code
+```
+
+To redo past scores (for example after `hp frost-train`), stop the service
+during the backfill:
+
+```bash
+sudo systemctl stop hp-frost
+uv run --env-file config/hp-db.env hp frost-backfill
+sudo systemctl start hp-frost
+```
+
 ## hp-web
 
 ```bash

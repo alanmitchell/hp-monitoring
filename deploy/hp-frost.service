@@ -1,0 +1,23 @@
+[Unit]
+Description=Heat pump frost score (hp-frost)
+# Start after the database when both start at boot. Not a hard dependency:
+# hp-frost waits whenever hp-db is down and then catches up.
+After=hp-db.service
+# Keep restarting forever; never give up after repeated failures
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Adjust the user and the /home/alan paths if the mini-PC differs
+User=alan
+WorkingDirectory=/home/alan/hp-monitoring
+# Holds HP_DB_TOKEN; see config/hp-db.example.env
+EnvironmentFile=/home/alan/hp-monitoring/config/hp-db.env
+# Show print() output in the journal immediately
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/alan/hp-monitoring/.venv/bin/hp-frost
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

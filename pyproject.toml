@@ -23,6 +23,10 @@ camera = [
     "opencv-python-headless>=5.0.0.93",
 ]
 analysis = []
+# hp-frost and the `hp frost-...` commands read the coil images
+frost = [
+    "opencv-python-headless>=5.0.0.93",
+]
 web = [
     "fastapi>=0.163.1",
     "pillow>=13.0.0",
@@ -35,6 +39,7 @@ hp-db = "heatpump.dbserver.main:main"
 hp-sensors = "heatpump.sensors.main:main"
 hp-camera = "heatpump.camera.capture:main"
 hp-web = "heatpump.web.main:main"
+hp-frost = "heatpump.frost.main:main"
 hp = "heatpump.cli:main"
 
 [dependency-groups]

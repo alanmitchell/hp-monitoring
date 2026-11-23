@@ -503,3 +503,51 @@ readings only; the real channels and thresholds are not known yet.
   every change. Add hysteresis or a minimum dwell if real data shows this.
 - Each image still opens and closes the RTSP stream (a few seconds). Fine at
   10 s intervals; not measured on the real camera.
+
+
+## 13. Frost sensor [built 2026-11-22]
+
+Asked for by Alan in `INSTRUCTIONS.md`. Built and tested on the development
+machine against a copy of the mini-PC's database and images (2026-11-16 to
+2026-11-21). Not yet installed or run on the mini-PC.
+The measurements, the models that were compared and the full list of limits are
+in `docs/frost-sensor.md`.
+
+- **`frost` is a sensor in `readings`**, 0 to 10, not `image_metrics` (Alan's
+  choice, so hp-web graphs it). Registered by `frost.register_sensor`.
+- **Fan running** = `coil_pressure` >= 20 Pa. Every 15 s on clock boundaries a
+  score from the plain average of the readings in [t - 7.5 s, t + 7.5 s),
+  leaving out readings below 20 Pa (Alan's rule). 23 Pa -> 0, 80 Pa -> 10,
+  linear. No reading >= 20 Pa in the span means no pressure score.
+- **Fan off**: each image whose latest pressure reading is below 20 Pa, or
+  older than 60 s (Alan: score the image if there is no pressure), gets an
+  image score at the image's timestamp.
+- `coil_pressure` is currently a Setra sensor, not the DG-700, stored on change
+  with a 15 s `max_interval`.
+- **Code**: `analysis/frost.py` (`compute`, `store`, `backfill`),
+  `analysis/frost_image.py` (features and scoring; OpenCV),
+  `analysis/frost_train.py`, `analysis/frost_model.json` (fitted numbers),
+  `frost/main.py` (`hp-frost`), `hp frost-backfill` and `hp frost-train` in
+  `cli.py`, `deploy/hp-frost.service`, new `frost` extra.
+- **`hp-frost`** computes [last stored score, now - 20 s) every 5 s. No spool:
+  a failed insert is recomputed. Known limit: after an `hp-db` outage it may
+  pass a stretch before `hp-sensors`/`hp-camera` have replayed their spools;
+  `hp frost-backfill --start ...` repairs that. Backfill deletes then
+  re-inserts per 6-hour chunk (`DELETE FROM hp.readings` works over Quack);
+  stop `hp-frost` while it runs.
+- **Image function**: half-size image, fixed region (rows 32-64%, columns
+  8-92%), 44 colour and texture statistics (saturation, blueness, brightness,
+  row-to-row gradient), ridge regression with numpy, features limited to their
+  training range. Clean coil is blue, frost is white. Trained on 2,082 fan-on
+  images. Leave-one-day-out mean absolute error 0.68; scores above 8 read about
+  1.7 low (only 11 such images). At 44 fan stops the first image score differed
+  from the last pressure score by 1.0 on average (the image is up to a minute
+  later, often already in defrost).
+- **Not verified**: fan-off images cannot be checked against pressure; the
+  camera was moved at least once (about a tenth of the image height) and the
+  region is chosen to stay inside the coil for both positions, but a larger
+  move needs new `ROI_*` values and retraining; snow on the coil or grille,
+  and the frost graph in a browser, are untested. Image scoring takes about
+  50 ms per image on the development machine, not measured on the N150.
+- hp-web: image scores more than `max_gap_seconds` (300) apart, as with idle
+  images every 15-30 min, show as separate points, not a line.
